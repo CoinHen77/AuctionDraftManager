@@ -205,7 +205,7 @@ function clearUrlId(){const u=new URL(location.href);u.searchParams.delete('id')
 // ── State ──────────────────────────────────────────────────────────────────
 const INIT_STATE=()=>({
   phase:'setup',view:'room',presentMode:false,
-  numTeams:10,budget:200,leagueName:'The League',benchCount:6,
+  numTeams:10,budget:200,leagueName:'The League',benchCount:6,commissionerCode:'',
   rosterSlots:DEFAULT_SLOTS.map(s=>({...s})),
   teamNames:Array.from({length:14},(_,i)=>`Team ${i+1}`),
   teams:[],draftedMap:{},nomination:null,bidTeamId:'',bidAmount:1,
@@ -214,11 +214,15 @@ const INIT_STATE=()=>({
 let S=INIT_STATE();
 let draftId=null;
 let unsub=null;
+let isCommissioner=false;
+let commLoginOpen=false;
+let commLoginError=false;
 
 // ── Firebase ───────────────────────────────────────────────────────────────
 function normalize(data){
   return{
     ...data,
+    commissionerCode:data.commissionerCode||'',
     rosterSlots:toArr(data.rosterSlots),
     teamNames:toArr(data.teamNames),
     teams:toArr(data.teams).map(t=>({...t,roster:toArr(t.roster)})),
@@ -233,7 +237,7 @@ async function push(){
   if(!draftId)return;
   const d={
     phase:S.phase,view:S.view,presentMode:S.presentMode,
-    numTeams:S.numTeams,budget:S.budget,leagueName:S.leagueName,benchCount:S.benchCount,
+    numTeams:S.numTeams,budget:S.budget,leagueName:S.leagueName,benchCount:S.benchCount,commissionerCode:S.commissionerCode||'',
     rosterSlots:S.rosterSlots,teamNames:S.teamNames,
     teams:S.teams,draftedMap:S.draftedMap,
     nomination:S.nomination||null,bidTeamId:S.bidTeamId||'',bidAmount:S.bidAmount||1,
@@ -259,6 +263,7 @@ function local(patch){S={...S,...patch};render()}
 function commit(patch){S={...S,...patch};render();push().catch(console.error)}
 
 function startDraft(){
+  isCommissioner=true;
   draftId=genId();
   setUrlId(draftId);
   const teams=S.teamNames.slice(0,S.numTeams).map((name,i)=>({
@@ -273,6 +278,7 @@ function startDraft(){
 function newDraft(){
   if(unsub){unsub();unsub=null}
   draftId=null;clearUrlId();
+  isCommissioner=false;commLoginOpen=false;commLoginError=false;
   S=INIT_STATE();render();
 }
 
@@ -374,8 +380,14 @@ function renderSetup(){
     </div>
   </div>
 
+  <div style="margin-bottom:28px">
+    <label class="lbl" style="margin-bottom:6px">Commissioner code</label>
+    <input class="inp" id="inp-comm-code" type="text" value="${esc(S.commissionerCode)}" placeholder="Set a code (optional)" style="max-width:320px">
+    <div style="margin-top:5px;font-size:11px;color:#AE8B5E">Only people with this code can nominate players and confirm picks. Leave blank to allow anyone with the link to run the draft.</div>
+  </div>
+
   <button class="btn-primary" id="btn-start">Start Draft →</button>
-  <div style="margin-top:16px;font-size:12px;color:#AE8B5E">Sample NFL player pool included. Anyone with the link can view the board; you run the picks.</div>
+  <div style="margin-top:16px;font-size:12px;color:#AE8B5E">Anyone with the link can view the board in real-time.</div>
 </div>`;
 }
 
@@ -388,6 +400,11 @@ function renderDraft(){
     <button class="tab ${view===v?'tab-on':'tab-off'}" data-view="${v}">
       ${v==='room'?'Draft Room':v==='board'?'Draft Board':'Rosters'}
     </button>`).join('');
+  const commBadge=S.commissionerCode
+    ?(isCommissioner
+      ?'<span style="font-family:\'Special Elite\',monospace;font-size:10px;color:#E3B95F;letter-spacing:2px;padding:5px 9px;border:1px solid #E3B95F;border-radius:2px;white-space:nowrap">COMMISSIONER</span>'
+      :'<button class="btn-ghost" id="btn-comm-login" style="font-size:12px">Commissioner Login</button>')
+    :'';
 
   const shareBar=draftId?`
     <div class="share-bar">
@@ -406,6 +423,7 @@ function renderDraft(){
     </div>
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
       ${tabs}
+      ${commBadge}
       <button class="btn-ghost" id="btn-new-draft">New Draft</button>
     </div>
   </div>
@@ -413,12 +431,25 @@ function renderDraft(){
   ${view==='room'?renderRoom(sz):''}
   ${view==='board'?renderBoard(sz):''}
   ${view==='rosters'?renderRosters():''}
+  ${commLoginOpen?renderCommLogin():''}
 </div>`;
 }
 
 function renderPlacard(sz){
   if(!S.nomination)return'';
   const p=PLAYER_BY_ID[S.nomination];if(!p)return'';
+  const canControl=isCommissioner||!S.commissionerCode;
+  if(!canControl){
+    return`
+<div class="placard" style="margin-bottom:20px;display:flex;align-items:center;gap:24px;flex-wrap:wrap">
+  <div>
+    <div style="font-family:'Special Elite',monospace;font-size:11px;letter-spacing:3px;color:#7A1F1F;font-weight:700;text-transform:uppercase;margin-bottom:6px">Now at the podium</div>
+    <div style="font-family:'Alfa Slab One',serif;font-size:34px;color:#231A12;line-height:1.05">${esc(p.name)}</div>
+    <div style="color:#6B5638;font-size:13px;margin-top:4px;letter-spacing:2px;text-transform:uppercase">${p.pos} · ${p.team}</div>
+  </div>
+  <div style="font-family:'Special Elite',monospace;font-size:13px;letter-spacing:3px;color:#7A1F1F;font-weight:700;text-transform:uppercase">BIDDING IN PROGRESS…</div>
+</div>`;
+  }
   const selTeam=S.teams.find(t=>t.id===S.bidTeamId);
   const selMax=selTeam?maxBid(selTeam,sz):0;
   const disableSold=!S.bidTeamId||S.bidAmount<1||S.bidAmount>selMax;
@@ -448,6 +479,7 @@ function renderPlacard(sz){
 }
 
 function renderRoom(sz){
+  const canControl=isCommissioner||!S.commissionerCode;
   const{draftedMap,search,posFilter,hideDrafted,teams,rosterSlots}=S;
 
   // Derive which positions are relevant from the configured slots
@@ -487,7 +519,9 @@ function renderRoom(sz){
   <span style="font-size:11px;color:#AE8B5E;font-family:'Special Elite',monospace">${bye?'Bye '+bye:'—'}</span>
   ${drafted
     ?`<span style="font-size:12px;font-family:'Special Elite',monospace;font-weight:700;text-align:right;color:${drTeam?.color||'#D9BE93'}">${esc(drTeam?.name||'')} · ${$m(dr.price)}</span>`
-    :`<button class="btn-nom nom-btn" data-pid="${p.id}">Nominate</button>`}
+    :canControl
+      ?`<button class="btn-nom nom-btn" data-pid="${p.id}">Nominate</button>`
+      :'<span></span>'}
 </div>`;
   }).join('');
 
@@ -527,6 +561,7 @@ function renderRoom(sz){
 }
 
 function renderBoard(sz){
+  const canControl=isCommissioner||!S.commissionerCode;
   const{teams,presentMode}=S;
   const cols=teams.map(t=>{
     const roster=toArr(t.roster);
@@ -538,8 +573,8 @@ function renderBoard(sz){
   <div style="display:flex;justify-content:space-between;font-size:10.5px;color:#D9BE93;font-family:'Special Elite',monospace">
     <span>${p.pos} · ${p.team}</span><span style="color:#E3B95F;font-weight:700">${$m(pick.price)}</span>
   </div>
-  <button class="undo-btn" data-tid="${t.id}" data-pid="${pick.playerId}"
-    style="position:absolute;top:4px;right:6px;background:transparent;border:none;color:#AE8B5E;font-size:10px;cursor:pointer;font-family:'Special Elite',monospace;padding:2px">undo</button>
+  ${canControl?`<button class="undo-btn" data-tid="${t.id}" data-pid="${pick.playerId}"
+    style="position:absolute;top:4px;right:6px;background:transparent;border:none;color:#AE8B5E;font-size:10px;cursor:pointer;font-family:'Special Elite',monospace;padding:2px">undo</button>`:''}
 </div>`;
     }).join('');
     const empties=Array.from({length:Math.max(0,sz-roster.length)}).map(()=>'<div class="board-empty"></div>').join('');
@@ -601,6 +636,23 @@ function renderRosters(){
   return`<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px">${cards}</div>`;
 }
 
+function renderCommLogin(){
+  return`
+<div style="position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:500;display:flex;align-items:center;justify-content:center;padding:24px">
+  <div class="panel" style="max-width:360px;width:100%;padding:28px">
+    <div class="eyebrow" style="margin-bottom:4px">COMMISSIONER LOGIN</div>
+    <div style="font-family:'Alfa Slab One',serif;font-size:22px;color:#F2EAD3;margin-bottom:12px">Run the board.</div>
+    <div style="color:#D9BE93;font-size:14px;margin-bottom:16px">Enter the commissioner code to manage nominations, picks, and undos.</div>
+    <input class="inp" id="comm-code-inp" type="password" placeholder="Commissioner code" style="margin-bottom:8px">
+    ${commLoginError?'<div style="color:#C05C5C;font-size:12px;margin-bottom:10px;font-family:\'Special Elite\',monospace;letter-spacing:1px">INCORRECT CODE — try again.</div>':''}
+    <div style="display:flex;gap:10px;margin-top:10px">
+      <button class="btn-primary" id="btn-comm-submit" style="flex:1;padding:12px">Enter</button>
+      <button class="btn-ghost" id="btn-comm-cancel">Cancel</button>
+    </div>
+  </div>
+</div>`;
+}
+
 // ── Event binding ──────────────────────────────────────────────────────────
 function bind(){
   const g=id=>document.getElementById(id);
@@ -635,6 +687,7 @@ function bind(){
     const i=Number(e.target.dataset.i);
     const names=[...S.teamNames];names[i]=e.target.value;S={...S,teamNames:names};
   }));
+  g('inp-comm-code')?.addEventListener('input',e=>{S={...S,commissionerCode:e.target.value}});
   g('btn-start')?.addEventListener('click',startDraft);
 
   // Draft header
@@ -665,6 +718,18 @@ function bind(){
   all('[data-pos]').forEach(el=>el.addEventListener('click',e=>local({posFilter:e.currentTarget.dataset.pos})));
   g('cb-hide')?.addEventListener('change',e=>local({hideDrafted:e.target.checked}));
   all('.nom-btn').forEach(el=>el.addEventListener('click',e=>openNom(e.currentTarget.dataset.pid)));
+
+  // Commissioner login modal
+  g('btn-comm-login')?.addEventListener('click',()=>{commLoginOpen=true;commLoginError=false;render()});
+  const tryLogin=()=>{
+    const val=g('comm-code-inp')?.value||'';
+    if(val===S.commissionerCode){isCommissioner=true;commLoginOpen=false;commLoginError=false;render();}
+    else{commLoginError=true;render();g('comm-code-inp')?.focus();}
+  };
+  g('btn-comm-submit')?.addEventListener('click',tryLogin);
+  g('btn-comm-cancel')?.addEventListener('click',()=>{commLoginOpen=false;commLoginError=false;render()});
+  g('comm-code-inp')?.addEventListener('keydown',e=>{if(e.key==='Enter')tryLogin()});
+  if(commLoginOpen)g('comm-code-inp')?.focus();
 
   // Board
   all('.undo-btn').forEach(el=>el.addEventListener('click',e=>{
