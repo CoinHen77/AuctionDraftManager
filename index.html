@@ -544,9 +544,9 @@ function renderRoom(sz){
     <span style="font-family:'Saira Condensed',sans-serif;font-size:15px;font-weight:600;text-transform:uppercase;color:#F2EAD3">${esc(t.name)}</span>
   </div>
   <div style="display:flex;justify-content:space-between">
-    <div><div style="font-size:9px;letter-spacing:1px;color:#AE8B5E">BUDGET LEFT</div><div style="font-family:'Special Elite',monospace;font-size:14px;font-weight:700;color:#E3B95F">${$m(t.budgetRemaining)}</div></div>
-    <div><div style="font-size:9px;letter-spacing:1px;color:#AE8B5E">MAX BID</div><div style="font-family:'Special Elite',monospace;font-size:14px;font-weight:700;color:#F2EAD3">${$m(maxBid(t,sz))}</div></div>
-    <div><div style="font-size:9px;letter-spacing:1px;color:#AE8B5E">SLOTS</div><div style="font-family:'Special Elite',monospace;font-size:14px;font-weight:700;color:#F2EAD3">${rem}/${sz}</div></div>
+    <div><div style="font-size:11px;letter-spacing:1px;color:#AE8B5E;margin-bottom:4px">BUDGET LEFT</div><div style="font-family:'Special Elite',monospace;font-size:15px;font-weight:700;color:#E3B95F">${$m(t.budgetRemaining)}</div></div>
+    <div><div style="font-size:11px;letter-spacing:1px;color:#AE8B5E;margin-bottom:4px">MAX BID</div><div style="font-family:'Special Elite',monospace;font-size:15px;font-weight:700;color:#F2EAD3">${$m(maxBid(t,sz))}</div></div>
+    <div><div style="font-size:11px;letter-spacing:1px;color:#AE8B5E;margin-bottom:4px">SLOTS</div><div style="font-family:'Special Elite',monospace;font-size:15px;font-weight:700;color:#F2EAD3">${rem}/${sz}</div></div>
   </div>
 </div>`;
   }).join('');
@@ -573,41 +573,51 @@ function renderRoom(sz){
 function renderBoard(sz){
   const canControl=isCommissioner||!S.commissionerCode;
   const{teams,presentMode}=S;
+  // Scale fonts down as team count grows so all columns fit without scrolling
+  const n=Math.max(teams.length,1);
+  const scale=Math.max(0.62,1-(n-6)*0.03);
+  const nameFz=(12.5*scale).toFixed(1);
+  const detailFz=(10.5*scale).toFixed(1);
+  const hdNameFz=(15*scale).toFixed(1);
+  const hdBudgetFz=(12*scale).toFixed(1);
+  const gapPx=n>10?6:10;
+  const padPx=n>10?5:8;
+
   const cols=teams.map(t=>{
     const roster=toArr(t.roster);
     const picks=roster.map(pick=>{
       const p=PLAYER_BY_ID[pick.playerId];if(!p)return'';
       return`
 <div class="board-pick">
-  <div style="font-size:12.5px;font-weight:600;color:#F2EAD3;padding-right:28px">${esc(p.name)}</div>
-  <div style="display:flex;justify-content:space-between;font-size:10.5px;color:#D9BE93;font-family:'Special Elite',monospace">
-    <span>${p.pos} · ${p.team}</span><span style="color:#E3B95F;font-weight:700">${$m(pick.price)}</span>
+  <div style="font-size:${nameFz}px;font-weight:600;color:#F2EAD3;padding-right:${canControl?22:4}px;white-space:nowrap;overflow:hidden">${esc(p.name)}</div>
+  <div style="display:flex;justify-content:space-between;font-size:${detailFz}px;color:#D9BE93;font-family:'Special Elite',monospace">
+    <span>${p.pos}·${p.team}</span><span style="color:#E3B95F;font-weight:700">${$m(pick.price)}</span>
   </div>
   ${canControl?`<button class="undo-btn" data-tid="${t.id}" data-pid="${pick.playerId}"
-    style="position:absolute;top:4px;right:6px;background:transparent;border:none;color:#AE8B5E;font-size:10px;cursor:pointer;font-family:'Special Elite',monospace;padding:2px">undo</button>`:''}
+    style="position:absolute;top:3px;right:4px;background:transparent;border:none;color:#AE8B5E;font-size:9px;cursor:pointer;font-family:'Special Elite',monospace;padding:1px">undo</button>`:''}
 </div>`;
     }).join('');
     const empties=Array.from({length:Math.max(0,sz-roster.length)}).map(()=>'<div class="board-empty"></div>').join('');
     return`
-<div style="background:#5A3819;border:1px solid #8A5F35;border-radius:3px;overflow:hidden;display:flex;flex-direction:column">
-  <div style="padding:10px 12px;background:${t.color};color:#F7EFDA">
-    <div style="font-family:'Saira Condensed',sans-serif;font-size:15px;font-weight:700;text-transform:uppercase">${esc(t.name)}</div>
-    <div style="font-family:'Special Elite',monospace;font-size:12px;font-weight:700">${$m(t.budgetRemaining)} left</div>
+<div style="background:#5A3819;border:1px solid #8A5F35;border-radius:3px;overflow:hidden;display:flex;flex-direction:column;min-width:0">
+  <div style="padding:8px 10px;background:${t.color};color:#F7EFDA">
+    <div style="font-family:'Saira Condensed',sans-serif;font-size:${hdNameFz}px;font-weight:700;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(t.name)}</div>
+    <div style="font-family:'Special Elite',monospace;font-size:${hdBudgetFz}px;font-weight:700">${$m(t.budgetRemaining)} left</div>
   </div>
-  <div style="display:flex;flex-direction:column;gap:4px;padding:8px">${picks}${empties}</div>
+  <div style="display:flex;flex-direction:column;gap:${gapPx/2}px;padding:${padPx}px">${picks}${empties}</div>
 </div>`;
   }).join('');
 
   const wrapStyle=presentMode
-    ?'position:fixed;inset:0;background:radial-gradient(120% 80% at 15% 0%,#7A5029 0%,#5E3B1D 45%,#3F2611 100%);z-index:1000;padding:24px;overflow:auto'
+    ?'position:fixed;inset:0;background:radial-gradient(120% 80% at 15% 0%,#7A5029 0%,#5E3B1D 45%,#3F2611 100%);z-index:1000;padding:20px;overflow:hidden'
     :'';
   return`
-<div style="${wrapStyle}">
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+<div style="${wrapStyle}${presentMode?';display:flex;flex-direction:column':''}">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px${presentMode?';flex-shrink:0':''}">
     <span class="eyebrow-sm">DRAFT BOARD</span>
     <button class="btn-ghost" id="btn-present">${presentMode?'Exit Present Mode':'Present Mode (for projector)'}</button>
   </div>
-  <div style="display:grid;gap:10px;grid-template-columns:repeat(${Math.max(teams.length,1)},minmax(180px,1fr));overflow-x:auto">
+  <div style="display:grid;gap:${gapPx}px;grid-template-columns:repeat(${n},1fr);${presentMode?'flex:1;overflow:hidden':''}">
     ${cols}
   </div>
 </div>`;
@@ -724,7 +734,12 @@ function bind(){
   g('btn-cancel')?.addEventListener('click',closeNom);
 
   // Room
-  g('inp-search')?.addEventListener('input',e=>local({search:e.target.value}));
+  g('inp-search')?.addEventListener('input',e=>{
+    const pos=e.target.selectionStart;
+    local({search:e.target.value});
+    const el=g('inp-search');
+    if(el){el.focus();try{el.setSelectionRange(pos,pos)}catch{}}
+  });
   all('[data-pos]').forEach(el=>el.addEventListener('click',e=>local({posFilter:e.currentTarget.dataset.pos})));
   g('cb-hide')?.addEventListener('change',e=>local({hideDrafted:e.target.checked}));
   all('.nom-btn').forEach(el=>el.addEventListener('click',e=>openNom(e.currentTarget.dataset.pid)));
