@@ -247,7 +247,7 @@ function normalize(data){
 async function push(){
   if(!draftId)return;
   const d={
-    phase:S.phase,view:S.view,presentMode:S.presentMode,
+    phase:S.phase,
     numTeams:S.numTeams,budget:S.budget,leagueName:S.leagueName,benchCount:S.benchCount,commissionerCode:S.commissionerCode||'',
     rosterSlots:S.rosterSlots,teamNames:S.teamNames,
     teams:S.teams,draftedMap:S.draftedMap,
@@ -262,8 +262,8 @@ function subscribe(){
     const data=snap.val();
     if(!data)return;
     // preserve local-only UI state
-    const{search=S.search||'',posFilter=S.posFilter||'ALL',hideDrafted=S.hideDrafted!==undefined?S.hideDrafted:true,sortOrder=S.sortOrder||'rank'}=S;
-    S={...normalize(data),search,posFilter,hideDrafted,sortOrder};
+    const{search=S.search||'',posFilter=S.posFilter||'ALL',hideDrafted=S.hideDrafted!==undefined?S.hideDrafted:true,sortOrder=S.sortOrder||'rank',view=S.view||'room',presentMode=S.presentMode||false}=S;
+    S={...normalize(data),search,posFilter,hideDrafted,sortOrder,view,presentMode};
     render();
   });
 }
@@ -321,8 +321,8 @@ function undoPick(teamId,playerId){
   commit({teams,draftedMap:dm});
 }
 
-function setView(v){commit({view:v})}
-function togglePresent(){commit({presentMode:!S.presentMode})}
+function setView(v){local({view:v})}
+function togglePresent(){local({presentMode:!S.presentMode})}
 
 // ── Render ─────────────────────────────────────────────────────────────────
 function render(){
@@ -785,7 +785,7 @@ async function init(){
     draftId=id;
     const snap=await get(ref(db,`drafts/${id}`));
     const data=snap.val();
-    if(data)S={...S,...normalize(data)};
+    if(data){const{view,presentMode}=S;S={...S,...normalize(data),view,presentMode};}
     subscribe();
   }
   render();
