@@ -107,24 +107,56 @@ const DEFAULT_SLOTS=[
   {id:'s1',type:'QB',count:1},{id:'s2',type:'RB',count:2},{id:'s3',type:'WR',count:2},
   {id:'s4',type:'TE',count:1},{id:'s5',type:'FLEX',count:1},{id:'s6',type:'DST',count:1},{id:'s7',type:'K',count:1},
 ];
-const PLAYERS=[
-  {id:'p1',name:'Patrick Mahomes',pos:'QB',team:'KC'},{id:'p2',name:'Josh Allen',pos:'QB',team:'BUF'},
-  {id:'p3',name:'Jalen Hurts',pos:'QB',team:'PHI'},{id:'p27',name:'Lamar Jackson',pos:'QB',team:'BAL'},
-  {id:'p4',name:'Christian McCaffrey',pos:'RB',team:'SF'},{id:'p5',name:'Bijan Robinson',pos:'RB',team:'ATL'},
-  {id:'p6',name:'Breece Hall',pos:'RB',team:'NYJ'},{id:'p7',name:'Jahmyr Gibbs',pos:'RB',team:'DET'},
-  {id:'p20',name:'Saquon Barkley',pos:'RB',team:'PHI'},{id:'p23',name:"De'Von Achane",pos:'RB',team:'MIA'},
-  {id:'p25',name:'Kyren Williams',pos:'RB',team:'LAR'},{id:'p30',name:'Rachaad White',pos:'RB',team:'TB'},
-  {id:'p8',name:"Ja'Marr Chase",pos:'WR',team:'CIN'},{id:'p9',name:'Justin Jefferson',pos:'WR',team:'MIN'},
-  {id:'p10',name:'Amon-Ra St. Brown',pos:'WR',team:'DET'},{id:'p11',name:'CeeDee Lamb',pos:'WR',team:'DAL'},
-  {id:'p12',name:'Puka Nacua',pos:'WR',team:'LAR'},{id:'p21',name:'A.J. Brown',pos:'WR',team:'PHI'},
-  {id:'p22',name:'Tyreek Hill',pos:'WR',team:'MIA'},{id:'p24',name:'Nico Collins',pos:'WR',team:'HOU'},
-  {id:'p28',name:'Chris Olave',pos:'WR',team:'NO'},{id:'p29',name:'DK Metcalf',pos:'WR',team:'SEA'},
-  {id:'p13',name:'Sam LaPorta',pos:'TE',team:'DET'},{id:'p14',name:'Travis Kelce',pos:'TE',team:'KC'},
-  {id:'p15',name:'Trey McBride',pos:'TE',team:'ARI'},{id:'p26',name:'George Kittle',pos:'TE',team:'SF'},
-  {id:'p16',name:'San Francisco',pos:'DEF',team:'SF'},{id:'p17',name:'Baltimore',pos:'DEF',team:'BAL'},
-  {id:'p18',name:'Harrison Butker',pos:'K',team:'KC'},{id:'p19',name:'Brandon Aubrey',pos:'K',team:'DAL'},
+// All 32 defenses — always available, not pulled from Sleeper
+const DEF_PLAYERS=[
+  {id:'def_ARI',name:'Arizona',pos:'DEF',team:'ARI'},{id:'def_ATL',name:'Atlanta',pos:'DEF',team:'ATL'},
+  {id:'def_BAL',name:'Baltimore',pos:'DEF',team:'BAL'},{id:'def_BUF',name:'Buffalo',pos:'DEF',team:'BUF'},
+  {id:'def_CAR',name:'Carolina',pos:'DEF',team:'CAR'},{id:'def_CHI',name:'Chicago',pos:'DEF',team:'CHI'},
+  {id:'def_CIN',name:'Cincinnati',pos:'DEF',team:'CIN'},{id:'def_CLE',name:'Cleveland',pos:'DEF',team:'CLE'},
+  {id:'def_DAL',name:'Dallas',pos:'DEF',team:'DAL'},{id:'def_DEN',name:'Denver',pos:'DEF',team:'DEN'},
+  {id:'def_DET',name:'Detroit',pos:'DEF',team:'DET'},{id:'def_GB',name:'Green Bay',pos:'DEF',team:'GB'},
+  {id:'def_HOU',name:'Houston',pos:'DEF',team:'HOU'},{id:'def_IND',name:'Indianapolis',pos:'DEF',team:'IND'},
+  {id:'def_JAX',name:'Jacksonville',pos:'DEF',team:'JAX'},{id:'def_KC',name:'Kansas City',pos:'DEF',team:'KC'},
+  {id:'def_LAC',name:'L.A. Chargers',pos:'DEF',team:'LAC'},{id:'def_LAR',name:'L.A. Rams',pos:'DEF',team:'LAR'},
+  {id:'def_LV',name:'Las Vegas',pos:'DEF',team:'LV'},{id:'def_MIA',name:'Miami',pos:'DEF',team:'MIA'},
+  {id:'def_MIN',name:'Minnesota',pos:'DEF',team:'MIN'},{id:'def_NE',name:'New England',pos:'DEF',team:'NE'},
+  {id:'def_NO',name:'New Orleans',pos:'DEF',team:'NO'},{id:'def_NYG',name:'N.Y. Giants',pos:'DEF',team:'NYG'},
+  {id:'def_NYJ',name:'N.Y. Jets',pos:'DEF',team:'NYJ'},{id:'def_PHI',name:'Philadelphia',pos:'DEF',team:'PHI'},
+  {id:'def_PIT',name:'Pittsburgh',pos:'DEF',team:'PIT'},{id:'def_SF',name:'San Francisco',pos:'DEF',team:'SF'},
+  {id:'def_SEA',name:'Seattle',pos:'DEF',team:'SEA'},{id:'def_TB',name:'Tampa Bay',pos:'DEF',team:'TB'},
+  {id:'def_TEN',name:'Tennessee',pos:'DEF',team:'TEN'},{id:'def_WAS',name:'Washington',pos:'DEF',team:'WAS'},
 ];
-const PLAYER_BY_ID=Object.fromEntries(PLAYERS.map(p=>[p.id,p]));
+
+let PLAYERS=[];
+let PLAYER_BY_ID={};
+
+async function loadPlayers(){
+  const CACHE='sleeper_nfl_v1';
+  try{
+    const cached=sessionStorage.getItem(CACHE);
+    if(cached){const p=JSON.parse(cached);PLAYERS=p;PLAYER_BY_ID=Object.fromEntries(p.map(x=>[x.id,x]));return}
+  }catch{}
+  const res=await fetch('https://api.sleeper.app/v1/players/nfl');
+  if(!res.ok)throw new Error('Sleeper API '+res.status);
+  const data=await res.json();
+  const WANTED=new Set(['QB','RB','WR','TE','K']);
+  const skilled=Object.values(data)
+    .filter(p=>WANTED.has(p.position)&&p.team&&p.full_name&&p.active!==false)
+    .map(p=>({
+      id:'sl_'+p.player_id,
+      name:p.full_name,
+      pos:p.position,
+      team:p.team,
+      rank:typeof p.search_rank==='number'?p.search_rank:999999,
+    }))
+    .sort((a,b)=>a.rank-b.rank)
+    .slice(0,400)
+    .map(({rank:_,...p})=>p); // drop rank from stored object
+  const all=[...skilled,...DEF_PLAYERS];
+  try{sessionStorage.setItem(CACHE,JSON.stringify(all))}catch{}
+  PLAYERS=all;
+  PLAYER_BY_ID=Object.fromEntries(all.map(p=>[p.id,p]));
+}
 const TEAM_COLORS=['#7A1F1F','#B99B54','#3E5C4B','#8A5F35','#4A5D7E','#9C5A2B','#5E4B7E','#6E7A3C','#A8452F','#2F6B6B','#8C6F2F','#7E4A5D'];
 
 // ── Utilities ──────────────────────────────────────────────────────────────
@@ -470,8 +502,9 @@ function renderRoom(sz){
         <input type="checkbox" id="cb-hide"${hideDrafted?' checked':''}> Hide drafted
       </label>
     </div>
-    ${showPrompt?'<div style="color:#D9BE93;font-size:13px;padding:16px 4px">Search a name or pick a position to browse the pool.</div>':''}
-    ${noMatch?'<div style="color:#D9BE93;font-size:13px;padding:16px 4px">No matching players.</div>':''}
+    ${!playersLoaded?'<div style="color:#AE8B5E;font-family:\'Special Elite\',monospace;font-size:12px;letter-spacing:2px;padding:16px 4px">LOADING PLAYER POOL…</div>':''}
+    ${playersLoaded&&showPrompt?'<div style="color:#D9BE93;font-size:13px;padding:16px 4px">Search a name or pick a position to browse the pool.</div>':''}
+    ${playersLoaded&&noMatch?'<div style="color:#D9BE93;font-size:13px;padding:16px 4px">No matching players.</div>':''}
     <div style="max-height:520px;overflow-y:auto;display:flex;flex-direction:column;gap:4px">${rows}</div>
   </div>
   <div style="display:flex;flex-direction:column;gap:10px;max-height:700px;overflow-y:auto">${cards}</div>
@@ -626,6 +659,8 @@ function bind(){
 }
 
 // ── Init ───────────────────────────────────────────────────────────────────
+let playersLoaded=false;
+
 async function init(){
   const id=urlId();
   if(id){
@@ -636,6 +671,14 @@ async function init(){
     subscribe();
   }
   render();
+  // Load players in background — re-render room panel when done
+  loadPlayers()
+    .then(()=>{playersLoaded=true;render()})
+    .catch(err=>{
+      console.error('Sleeper load failed:',err);
+      playersLoaded=true; // unblock UI
+      render();
+    });
 }
 
 init();
