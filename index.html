@@ -92,7 +92,6 @@ const db=getDatabase(fbApp);
 
 // ── Constants ──────────────────────────────────────────────────────────────
 const POSITIONS=['QB','RB','WR','TE','K','DEF'];
-const BYE={CAR:5,KC:5,CIN:6,DET:6,MIA:6,MIN:6,BUF:7,JAX:7,LAC:7,WAS:7,HOU:8,NO:8,NYG:8,SF:8,PIT:9,TEN:9,CHI:10,DEN:10,PHI:10,TB:10,ATL:11,CLE:11,GB:11,LAR:11,NE:11,SEA:11,BAL:13,IND:13,LV:13,NYJ:13,ARI:14,DAL:14};
 const SLOT_TYPES=[
   {key:'QB',label:'QB',positions:['QB']},
   {key:'RB',label:'RB',positions:['RB']},
@@ -140,6 +139,10 @@ async function loadPlayers(){
   if(!res.ok)throw new Error('Sleeper API '+res.status);
   const data=await res.json();
   const WANTED=new Set(['QB','RB','WR','TE','K']);
+  // Build team→bye map so DEF entries get bye weeks too
+  const teamBye={};
+  Object.values(data).forEach(p=>{if(p.team&&p.bye_week)teamBye[p.team]=p.bye_week});
+
   const skilled=Object.values(data)
     .filter(p=>WANTED.has(p.position)&&p.team&&p.full_name&&p.active!==false)
     .map(p=>({
@@ -147,12 +150,14 @@ async function loadPlayers(){
       name:p.full_name,
       pos:p.position,
       team:p.team,
+      bye:p.bye_week||null,
       rank:typeof p.search_rank==='number'?p.search_rank:999999,
     }))
     .sort((a,b)=>a.rank-b.rank)
     .slice(0,400)
-    .map(({rank:_,...p})=>p); // drop rank from stored object
-  const all=[...skilled,...DEF_PLAYERS];
+    .map(({rank:_,...p})=>p);
+  const defsWithBye=DEF_PLAYERS.map(d=>({...d,bye:teamBye[d.team]||null}));
+  const all=[...skilled,...defsWithBye];
   try{sessionStorage.setItem(CACHE,JSON.stringify(all))}catch{}
   PLAYERS=all;
   PLAYER_BY_ID=Object.fromEntries(all.map(p=>[p.id,p]));
@@ -462,7 +467,7 @@ function renderRoom(sz){
   const rows=filtered.map(p=>{
     const dr=draftedMap[p.id];
     const drTeam=dr&&teams.find(t=>t.id===dr.teamId);
-    const bye=BYE[p.team];
+    const bye=p.bye||null;
     const drafted=!!dr;
     return`
 <div class="prow ${drafted?'prow-drafted':'prow-avail'}">
