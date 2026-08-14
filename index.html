@@ -219,6 +219,7 @@ const INIT_STATE=()=>({
   rosterSlots:DEFAULT_SLOTS.map(s=>({...s})),
   teamNames:Array.from({length:14},(_,i)=>`Team ${i+1}`),
   teams:[],draftedMap:{},nomination:null,bidTeamId:'',bidAmount:1,
+  search:'',posFilter:'ALL',hideDrafted:true,sortOrder:'rank',
 });
 
 let S=INIT_STATE();
@@ -261,8 +262,8 @@ function subscribe(){
     const data=snap.val();
     if(!data)return;
     // preserve local-only UI state
-    const{search=S.search||'',posFilter=S.posFilter||'ALL',hideDrafted=S.hideDrafted!==undefined?S.hideDrafted:true}=S;
-    S={...normalize(data),search,posFilter,hideDrafted};
+    const{search=S.search||'',posFilter=S.posFilter||'ALL',hideDrafted=S.hideDrafted!==undefined?S.hideDrafted:true,sortOrder=S.sortOrder||'rank'}=S;
+    S={...normalize(data),search,posFilter,hideDrafted,sortOrder};
     render();
   });
 }
@@ -280,7 +281,7 @@ function startDraft(){
     id:'t'+i,name:(name&&name.trim())||`Team ${i+1}`,
     color:TEAM_COLORS[i%TEAM_COLORS.length],budgetRemaining:S.budget,roster:[],
   }));
-  S={...S,teams,draftedMap:{},nomination:null,bidTeamId:'',bidAmount:1,phase:'draft',view:'room',presentMode:false,search:'',posFilter:'ALL',hideDrafted:true};
+  S={...S,teams,draftedMap:{},nomination:null,bidTeamId:'',bidAmount:1,phase:'draft',view:'room',presentMode:false,search:'',posFilter:'ALL',hideDrafted:true,sortOrder:'rank'};
   render();
   push().then(()=>subscribe()).catch(console.error);
 }
@@ -490,7 +491,7 @@ function renderPlacard(sz){
 
 function renderRoom(sz){
   const canControl=isCommissioner||!S.commissionerCode;
-  const{draftedMap,search,posFilter,hideDrafted,teams,rosterSlots}=S;
+  const{draftedMap,search,posFilter,hideDrafted,sortOrder,teams,rosterSlots}=S;
 
   // Derive which positions are relevant from the configured slots
   const activePosSet=new Set();
@@ -504,12 +505,19 @@ function renderRoom(sz){
   const showPrompt=!q&&effectiveFilter==='ALL';
   let filtered=[];
   if(!showPrompt){
-    filtered=PLAYERS
+    let pool=PLAYERS
       .filter(p=>activePosSet.has(p.pos))
       .filter(p=>effectiveFilter==='ALL'||p.pos===effectiveFilter)
       .filter(p=>!q||p.name.toLowerCase().includes(q))
-      .filter(p=>!hideDrafted||!draftedMap[p.id])
-      .slice(0,100);
+      .filter(p=>!hideDrafted||!draftedMap[p.id]);
+    if(sortOrder==='alpha'){
+      pool=pool.slice().sort((a,b)=>{
+        const la=a.name.trim().split(' ').pop().toLowerCase();
+        const lb=b.name.trim().split(' ').pop().toLowerCase();
+        return la.localeCompare(lb);
+      });
+    }
+    filtered=pool.slice(0,100);
   }
   const noMatch=!showPrompt&&filtered.length===0;
 
@@ -557,6 +565,10 @@ function renderRoom(sz){
     <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:12px">
       <input class="inp" id="inp-search" placeholder="Search players by name…" value="${esc(search)}" style="flex:1 1 220px">
       <div style="display:flex;gap:4px;flex-wrap:wrap">${chips}</div>
+      <div style="display:flex;gap:4px">
+        <button class="chip ${sortOrder==='rank'?'chip-on':'chip-off'}" data-sort="rank">RANK</button>
+        <button class="chip ${sortOrder==='alpha'?'chip-on':'chip-off'}" data-sort="alpha">A–Z</button>
+      </div>
       <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#D9BE93;cursor:pointer">
         <input type="checkbox" id="cb-hide"${hideDrafted?' checked':''}> Hide drafted
       </label>
@@ -741,6 +753,7 @@ function bind(){
     if(el){el.focus();try{el.setSelectionRange(pos,pos)}catch{}}
   });
   all('[data-pos]').forEach(el=>el.addEventListener('click',e=>local({posFilter:e.currentTarget.dataset.pos})));
+  all('[data-sort]').forEach(el=>el.addEventListener('click',e=>local({sortOrder:e.currentTarget.dataset.sort})));
   g('cb-hide')?.addEventListener('change',e=>local({hideDrafted:e.target.checked}));
   all('.nom-btn').forEach(el=>el.addEventListener('click',e=>openNom(e.currentTarget.dataset.pid)));
 
