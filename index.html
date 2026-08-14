@@ -126,11 +126,24 @@ const DEF_PLAYERS=[
   {id:'def_TEN',name:'Tennessee',pos:'DEF',team:'TEN'},{id:'def_WAS',name:'Washington',pos:'DEF',team:'WAS'},
 ];
 
+// 2026 NFL bye weeks — update each August when schedule releases
+const TEAM_BYE={
+  KC:5,CAR:5,
+  MIA:6,CIN:6,DET:6,MIN:6,
+  BUF:7,LAC:7,WAS:7,JAX:7,
+  NYG:8,NO:8,SF:8,HOU:8,
+  TEN:9,PIT:9,
+  DEN:10,PHI:10,CHI:10,TB:10,
+  NE:11,CLE:11,SEA:11,GB:11,ATL:11,LAR:11,
+  IND:13,NYJ:13,LV:13,BAL:13,
+  DAL:14,ARI:14,
+};
+
 let PLAYERS=[];
 let PLAYER_BY_ID={};
 
 async function loadPlayers(){
-  const CACHE='sleeper_nfl_v1';
+  const CACHE='sleeper_nfl_v2';
   try{
     const cached=sessionStorage.getItem(CACHE);
     if(cached){const p=JSON.parse(cached);PLAYERS=p;PLAYER_BY_ID=Object.fromEntries(p.map(x=>[x.id,x]));return}
@@ -139,9 +152,6 @@ async function loadPlayers(){
   if(!res.ok)throw new Error('Sleeper API '+res.status);
   const data=await res.json();
   const WANTED=new Set(['QB','RB','WR','TE','K']);
-  // Build team→bye map so DEF entries get bye weeks too
-  const teamBye={};
-  Object.values(data).forEach(p=>{if(p.team&&p.bye_week)teamBye[p.team]=p.bye_week});
 
   const skilled=Object.values(data)
     .filter(p=>WANTED.has(p.position)&&p.team&&p.full_name&&p.active!==false)
@@ -150,13 +160,13 @@ async function loadPlayers(){
       name:p.full_name,
       pos:p.position,
       team:p.team,
-      bye:p.bye_week||null,
+      bye:TEAM_BYE[p.team]||null,
       rank:typeof p.search_rank==='number'?p.search_rank:999999,
     }))
     .sort((a,b)=>a.rank-b.rank)
     .slice(0,400)
     .map(({rank:_,...p})=>p);
-  const defsWithBye=DEF_PLAYERS.map(d=>({...d,bye:teamBye[d.team]||null}));
+  const defsWithBye=DEF_PLAYERS.map(d=>({...d,bye:TEAM_BYE[d.team]||null}));
   const all=[...skilled,...defsWithBye];
   try{sessionStorage.setItem(CACHE,JSON.stringify(all))}catch{}
   PLAYERS=all;
