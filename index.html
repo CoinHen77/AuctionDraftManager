@@ -448,21 +448,31 @@ function renderPlacard(sz){
 }
 
 function renderRoom(sz){
-  const{draftedMap,search,posFilter,hideDrafted,teams}=S;
+  const{draftedMap,search,posFilter,hideDrafted,teams,rosterSlots}=S;
+
+  // Derive which positions are relevant from the configured slots
+  const activePosSet=new Set();
+  toArr(rosterSlots).forEach(sl=>slotDef(sl.type).positions.forEach(p=>activePosSet.add(p)));
+  const activePositions=POSITIONS.filter(p=>activePosSet.has(p));
+
+  // If the saved posFilter is no longer valid (e.g. K removed), fall back to ALL
+  const effectiveFilter=activePosSet.has(posFilter)?posFilter:'ALL';
+
   const q=search.trim().toLowerCase();
-  const showPrompt=!q&&posFilter==='ALL';
+  const showPrompt=!q&&effectiveFilter==='ALL';
   let filtered=[];
   if(!showPrompt){
     filtered=PLAYERS
-      .filter(p=>posFilter==='ALL'||p.pos===posFilter)
+      .filter(p=>activePosSet.has(p.pos))
+      .filter(p=>effectiveFilter==='ALL'||p.pos===effectiveFilter)
       .filter(p=>!q||p.name.toLowerCase().includes(q))
       .filter(p=>!hideDrafted||!draftedMap[p.id])
       .slice(0,100);
   }
   const noMatch=!showPrompt&&filtered.length===0;
 
-  const chips=['ALL',...POSITIONS].map(p=>`
-    <button class="chip ${posFilter===p?'chip-on':'chip-off'}" data-pos="${p}">${p}</button>`).join('');
+  const chips=['ALL',...activePositions].map(p=>`
+    <button class="chip ${effectiveFilter===p?'chip-on':'chip-off'}" data-pos="${p}">${p}</button>`).join('');
 
   const rows=filtered.map(p=>{
     const dr=draftedMap[p.id];
