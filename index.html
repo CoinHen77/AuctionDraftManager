@@ -579,7 +579,7 @@ function renderBoard(sz){
   const nameFz=(12.5*scale).toFixed(1);
   const detailFz=(10.5*scale).toFixed(1);
   const hdNameFz=(15*scale).toFixed(1);
-  const hdBudgetFz=(12*scale).toFixed(1);
+  const hdBudgetFz=(14*scale).toFixed(1);
   const gapPx=n>10?6:10;
   const padPx=n>10?5:8;
 
@@ -589,7 +589,7 @@ function renderBoard(sz){
       const p=PLAYER_BY_ID[pick.playerId];if(!p)return'';
       return`
 <div class="board-pick">
-  <div style="font-size:${nameFz}px;font-weight:600;color:#F2EAD3;padding-right:${canControl?22:4}px;white-space:nowrap;overflow:hidden">${esc(p.name)}</div>
+  <div style="font-size:${nameFz}px;font-weight:600;color:#F2EAD3;padding-right:${canControl?22:4}px;white-space:nowrap;overflow:hidden;margin-bottom:3px">${esc(p.name)}</div>
   <div style="display:flex;justify-content:space-between;font-size:${detailFz}px;color:#D9BE93;font-family:'Special Elite',monospace">
     <span>${p.pos}·${p.team}</span><span style="color:#E3B95F;font-weight:700">${$m(pick.price)}</span>
   </div>
