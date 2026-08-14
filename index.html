@@ -217,9 +217,11 @@ function subscribe(){
 }
 
 // ── Mutations ──────────────────────────────────────────────────────────────
-function local(patch){S={...S,...patch};render()}  // search/filter only — no Firebase
+// Render immediately, sync Firebase in background so UI is never blocked
+function local(patch){S={...S,...patch};render()}
+function commit(patch){S={...S,...patch};render();push().catch(console.error)}
 
-async function startDraft(){
+function startDraft(){
   draftId=genId();
   setUrlId(draftId);
   const teams=S.teamNames.slice(0,S.numTeams).map((name,i)=>({
@@ -227,34 +229,33 @@ async function startDraft(){
     color:TEAM_COLORS[i%TEAM_COLORS.length],budgetRemaining:S.budget,roster:[],
   }));
   S={...S,teams,draftedMap:{},nomination:null,bidTeamId:'',bidAmount:1,phase:'draft',view:'room',presentMode:false,search:'',posFilter:'ALL',hideDrafted:true};
-  await push();
-  subscribe();
+  render();
+  push().then(()=>subscribe()).catch(console.error);
 }
 
-async function newDraft(){
+function newDraft(){
   if(unsub){unsub();unsub=null}
   draftId=null;clearUrlId();
   S=INIT_STATE();render();
 }
 
-async function openNom(playerId){S={...S,nomination:playerId,bidTeamId:'',bidAmount:1};await push()}
-async function closeNom(){S={...S,nomination:null,bidTeamId:'',bidAmount:1};await push()}
+function openNom(playerId){commit({nomination:playerId,bidTeamId:'',bidAmount:1})}
+function closeNom(){commit({nomination:null,bidTeamId:'',bidAmount:1})}
 
-async function confirmSold(){
+function confirmSold(){
   const{teams,nomination,bidTeamId,rosterSlots,benchCount}=S;
   const team=teams.find(t=>t.id===bidTeamId);
   if(!team||!nomination)return;
   const sz=rosterSize(rosterSlots,benchCount);
   const amt=Math.max(1,Math.min(S.bidAmount,maxBid(team,sz)));
-  S={...S,
+  commit({
     teams:teams.map(t=>t.id!==team.id?t:{...t,budgetRemaining:t.budgetRemaining-amt,roster:[...toArr(t.roster),{playerId:nomination,price:amt}]}),
     draftedMap:{...S.draftedMap,[nomination]:{teamId:team.id,price:amt}},
     nomination:null,bidTeamId:'',bidAmount:1,
-  };
-  await push();
+  });
 }
 
-async function undoPick(teamId,playerId){
+function undoPick(teamId,playerId){
   const teams=S.teams.map(t=>{
     if(t.id!==teamId)return t;
     const roster=toArr(t.roster);
@@ -263,12 +264,11 @@ async function undoPick(teamId,playerId){
     return{...t,budgetRemaining:t.budgetRemaining+pick.price,roster:roster.filter(r=>r.playerId!==playerId)};
   });
   const dm={...S.draftedMap};delete dm[playerId];
-  S={...S,teams,draftedMap:dm};
-  await push();
+  commit({teams,draftedMap:dm});
 }
 
-async function setView(v){S={...S,view:v};await push()}
-async function togglePresent(){S={...S,presentMode:!S.presentMode};await push()}
+function setView(v){commit({view:v})}
+function togglePresent(){commit({presentMode:!S.presentMode})}
 
 // ── Render ─────────────────────────────────────────────────────────────────
 function render(){
