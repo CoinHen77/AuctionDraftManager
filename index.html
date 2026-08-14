@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Auction Draft — The Old Ballyard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Alfa+Slab+One&family=Inter:wght@400;500;600;700&family=Saira+Condensed:wght@500;600;700&family=Special+Elite&family=Yellowtail&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{margin:0;background:radial-gradient(120% 80% at 15% 0%,#7A5029 0%,#5E3B1D 45%,#3F2611 100%) fixed;min-height:100vh}
+::placeholder{opacity:0.6}
+input[type="text"],input[type="number"],select{appearance:none;-webkit-appearance:none}
+input:disabled,select:disabled{opacity:0.45;-webkit-text-fill-color:currentColor}
+button:disabled{opacity:0.4;cursor:not-allowed}
+input:focus,select:focus,button:focus{outline:2px solid currentColor;outline-offset:1px}
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:rgba(0,0,0,0.15)}
+::-webkit-scrollbar-thumb{background:#8A5F35;border-radius:3px}
+
+#app{min-height:100vh;color:#F2EAD3;font-family:'Inter',sans-serif;padding:24px;color-scheme:dark}
+
+.eyebrow{font-family:'Special Elite',monospace;font-size:12px;letter-spacing:3px;color:#E3B95F;font-weight:700;text-transform:uppercase}
+.eyebrow-sm{font-family:'Special Elite',monospace;font-size:11px;letter-spacing:2px;color:#E3B95F;font-weight:700;text-transform:uppercase}
+.lbl{display:block;font-size:12px;letter-spacing:1px;color:#D9BE93;text-transform:uppercase;font-weight:600;font-family:'Inter',sans-serif}
+
+.inp{background:#3B2411;border:1px solid #8A5F35;border-radius:2px;color:#F2EAD3;padding:10px 12px;font-size:14px;font-family:'Inter',sans-serif;width:100%}
+.inp:focus{outline:2px solid #E3B95F;outline-offset:1px}
+select.inp{cursor:pointer}
+select.inp option{background:#3B2411;color:#F2EAD3}
+
+.btn-primary{background:#E3B95F;color:#2B1B0C;border:none;border-radius:3px;padding:14px 28px;font-size:15px;font-weight:700;cursor:pointer;font-family:'Saira Condensed',sans-serif;text-transform:uppercase;letter-spacing:1px}
+.btn-primary:hover:not(:disabled){background:#F0C96A}
+.btn-ghost{background:transparent;color:#F2EAD3;border:1px solid #8A5F35;border-radius:2px;padding:8px 14px;font-size:13px;cursor:pointer;font-family:'Inter',sans-serif}
+.btn-ghost:hover:not(:disabled){border-color:#D9BE93}
+.btn-nom{background:transparent;border:1px solid #E3B95F;color:#E3B95F;border-radius:2px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap}
+.btn-nom:hover:not(:disabled){background:rgba(227,185,95,0.1)}
+.btn-sold{background:#7A1F1F;color:#FFF6E4;border:none;border-radius:2px;padding:11px 24px;font-weight:700;font-size:14px;letter-spacing:2px;cursor:pointer;font-family:'Saira Condensed',sans-serif;text-transform:uppercase}
+.btn-sold:hover:not(:disabled){background:#8A2222}
+.btn-cancel-plac{background:transparent;color:#6B5638;border:1px solid #B99B54;border-radius:2px;padding:8px 14px;font-size:13px;cursor:pointer;font-family:'Inter',sans-serif}
+.btn-cancel-plac:hover{color:#8A7054}
+
+.tab{border-radius:2px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;font-family:'Inter',sans-serif;border:1px solid}
+.tab-on{background:#6B4423;color:#E3B95F;border-color:#E3B95F}
+.tab-off{background:transparent;color:#D9BE93;border-color:#8A5F35}
+.tab-off:hover{border-color:#D9BE93}
+
+.panel{background:#5A3819;border:1px solid #8A5F35;border-radius:4px;padding:18px;box-shadow:inset 0 0 0 1px rgba(242,234,211,0.08),0 6px 18px rgba(0,0,0,0.25);outline:1px dashed rgba(242,234,211,0.30);outline-offset:-7px}
+
+.chip{border-radius:2px;padding:6px 10px;font-size:12px;cursor:pointer;font-family:'Special Elite',monospace;border:1px solid}
+.chip-on{background:#E3B95F;color:#2B1B0C;border-color:#E3B95F;font-weight:700}
+.chip-off{background:transparent;color:#D9BE93;border-color:#8A5F35}
+.chip-off:hover{border-color:#D9BE93}
+
+.prow{display:grid;grid-template-columns:44px 1fr 56px 64px auto;align-items:center;gap:10px;padding:8px 10px;border-radius:2px}
+.prow-avail{background:#6B4423}
+.prow-drafted{background:rgba(63,38,17,0.6);opacity:0.55}
+
+.team-card{background:#5A3819;border:1px solid #8A5F35;border-radius:4px;padding:12px}
+
+.placard{background:#EDE3CC;border:2px solid #B99B54;border-radius:4px;padding:20px 24px;box-shadow:0 8px 0 rgba(0,0,0,0.24)}
+.plac-inp{background:rgba(0,0,0,0.05);border:1px solid #B99B54;border-radius:2px;color:#231A12;padding:10px 12px;font-size:14px;font-family:'Inter',sans-serif}
+.plac-inp:focus{outline:2px solid #7A1F1F;outline-offset:1px}
+select.plac-inp{cursor:pointer;min-width:220px;width:auto}
+select.plac-inp option{background:#EDE3CC;color:#231A12}
+
+.board-pick{background:#6B4423;border-radius:5px;padding:6px 8px;position:relative}
+.board-empty{border:1px dashed #8A5F35;border-radius:5px;height:30px}
+
+.rost-filled{display:flex;justify-content:space-between;font-size:13px;background:#6B4423;border-radius:5px;padding:6px 8px;margin-bottom:3px;color:#F2EAD3}
+.rost-empty{font-size:12px;color:#AE8B5E;border:1px dashed #8A5F35;border-radius:5px;padding:6px 8px;margin-bottom:3px}
+
+.share-bar{background:rgba(0,0,0,0.2);border:1px solid #8A5F35;border-radius:3px;padding:10px 14px;font-size:12px;color:#D9BE93;display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap}
+
+@media(max-width:1000px){.room-grid{grid-template-columns:1fr !important}}
+</style>
+</head>
+<body>
+<div id="app">
+  <div style="display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:'Special Elite',monospace;color:#AE8B5E;font-size:14px;letter-spacing:2px">
+    LOADING DRAFT ROOM…
+  </div>
+</div>
+<script type="module">
+import{initializeApp}from'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+import{getDatabase,ref,set,onValue,get}from'https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js';
+
+const FB_CFG={apiKey:"AIzaSyBMh7y3nUFxKSxjCctKyQajtnKUQWt3Jmo",authDomain:"auction-draft-manager.firebaseapp.com",databaseURL:"https://auction-draft-manager-default-rtdb.firebaseio.com",projectId:"auction-draft-manager",storageBucket:"auction-draft-manager.firebasestorage.app",messagingSenderId:"668595024390",appId:"1:668595024390:web:6de1e8f97decb867234987"};
+const fbApp=initializeApp(FB_CFG);
+const db=getDatabase(fbApp);
+
+// ── Constants ──────────────────────────────────────────────────────────────
+const POSITIONS=['QB','RB','WR','TE','K','DEF'];
+const BYE={CAR:5,KC:5,CIN:6,DET:6,MIA:6,MIN:6,BUF:7,JAX:7,LAC:7,WAS:7,HOU:8,NO:8,NYG:8,SF:8,PIT:9,TEN:9,CHI:10,DEN:10,PHI:10,TB:10,ATL:11,CLE:11,GB:11,LAR:11,NE:11,SEA:11,BAL:13,IND:13,LV:13,NYJ:13,ARI:14,DAL:14};
+const SLOT_TYPES=[
+  {key:'QB',label:'QB',positions:['QB']},
+  {key:'RB',label:'RB',positions:['RB']},
+  {key:'WR',label:'WR',positions:['WR']},
+  {key:'TE',label:'TE',positions:['TE']},
+  {key:'FLEX',label:'FLEX (RB/WR/TE)',positions:['RB','WR','TE']},
+  {key:'SUPERFLEX',label:'SUPERFLEX (QB/RB/WR/TE)',positions:['QB','RB','WR','TE']},
+  {key:'DST',label:'DST',positions:['DEF']},
+  {key:'K',label:'K',positions:['K']},
+];
+const DEFAULT_SLOTS=[
+  {id:'s1',type:'QB',count:1},{id:'s2',type:'RB',count:2},{id:'s3',type:'WR',count:2},
+  {id:'s4',type:'TE',count:1},{id:'s5',type:'FLEX',count:1},{id:'s6',type:'DST',count:1},{id:'s7',type:'K',count:1},
+];
+const PLAYERS=[
+  {id:'p1',name:'Patrick Mahomes',pos:'QB',team:'KC'},{id:'p2',name:'Josh Allen',pos:'QB',team:'BUF'},
+  {id:'p3',name:'Jalen Hurts',pos:'QB',team:'PHI'},{id:'p27',name:'Lamar Jackson',pos:'QB',team:'BAL'},
+  {id:'p4',name:'Christian McCaffrey',pos:'RB',team:'SF'},{id:'p5',name:'Bijan Robinson',pos:'RB',team:'ATL'},
+  {id:'p6',name:'Breece Hall',pos:'RB',team:'NYJ'},{id:'p7',name:'Jahmyr Gibbs',pos:'RB',team:'DET'},
+  {id:'p20',name:'Saquon Barkley',pos:'RB',team:'PHI'},{id:'p23',name:"De'Von Achane",pos:'RB',team:'MIA'},
+  {id:'p25',name:'Kyren Williams',pos:'RB',team:'LAR'},{id:'p30',name:'Rachaad White',pos:'RB',team:'TB'},
+  {id:'p8',name:"Ja'Marr Chase",pos:'WR',team:'CIN'},{id:'p9',name:'Justin Jefferson',pos:'WR',team:'MIN'},
+  {id:'p10',name:'Amon-Ra St. Brown',pos:'WR',team:'DET'},{id:'p11',name:'CeeDee Lamb',pos:'WR',team:'DAL'},
+  {id:'p12',name:'Puka Nacua',pos:'WR',team:'LAR'},{id:'p21',name:'A.J. Brown',pos:'WR',team:'PHI'},
+  {id:'p22',name:'Tyreek Hill',pos:'WR',team:'MIA'},{id:'p24',name:'Nico Collins',pos:'WR',team:'HOU'},
+  {id:'p28',name:'Chris Olave',pos:'WR',team:'NO'},{id:'p29',name:'DK Metcalf',pos:'WR',team:'SEA'},
+  {id:'p13',name:'Sam LaPorta',pos:'TE',team:'DET'},{id:'p14',name:'Travis Kelce',pos:'TE',team:'KC'},
+  {id:'p15',name:'Trey McBride',pos:'TE',team:'ARI'},{id:'p26',name:'George Kittle',pos:'TE',team:'SF'},
+  {id:'p16',name:'San Francisco',pos:'DEF',team:'SF'},{id:'p17',name:'Baltimore',pos:'DEF',team:'BAL'},
+  {id:'p18',name:'Harrison Butker',pos:'K',team:'KC'},{id:'p19',name:'Brandon Aubrey',pos:'K',team:'DAL'},
+];
+const PLAYER_BY_ID=Object.fromEntries(PLAYERS.map(p=>[p.id,p]));
+const TEAM_COLORS=['#7A1F1F','#B99B54','#3E5C4B','#8A5F35','#4A5D7E','#9C5A2B','#5E4B7E','#6E7A3C','#A8452F','#2F6B6B','#8C6F2F','#7E4A5D'];
+
+// ── Utilities ──────────────────────────────────────────────────────────────
+const $m=n=>'$'+Math.round(n).toLocaleString();
+const slotDef=type=>SLOT_TYPES.find(s=>s.key===type)||SLOT_TYPES[0];
+
+function toArr(v){
+  if(!v)return[];
+  if(Array.isArray(v))return v;
+  return Object.keys(v).sort((a,b)=>Number(a)-Number(b)).map(k=>v[k]);
+}
+
+function rosterSize(slots,bench){
+  return toArr(slots).reduce((a,s)=>a+(Number(s.count)||0),0)+(Number(bench)||0);
+}
+
+function maxBid(team,sz){
+  const rem=sz-toArr(team.roster).length;
+  if(rem<=0)return 0;
+  return Math.max(0,team.budgetRemaining-(rem-1));
+}
+
+function buildAssignment(team,slots,bench){
+  const working=toArr(slots).map(s=>({...s,def:slotDef(s.type),filled:[]}));
+  const order=[...working].sort((a,b)=>a.def.positions.length-b.def.positions.length);
+  const bch=[];
+  toArr(team.roster).forEach(pick=>{
+    const p=PLAYER_BY_ID[pick.playerId];if(!p)return;
+    const slot=order.find(s=>s.filled.length<s.count&&s.def.positions.includes(p.pos));
+    if(slot)slot.filled.push({pick,p});else bch.push({pick,p});
+  });
+  return{slots:working,bench:bch};
+}
+
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+function genId(){return Math.random().toString(36).slice(2,8).toUpperCase()}
+function urlId(){return new URLSearchParams(location.search).get('id')}
+function setUrlId(id){const u=new URL(location.href);u.searchParams.set('id',id);history.pushState({},'',u)}
+function clearUrlId(){const u=new URL(location.href);u.searchParams.delete('id');history.pushState({},'',u)}
+
+// ── State ──────────────────────────────────────────────────────────────────
+const INIT_STATE=()=>({
+  phase:'setup',view:'room',presentMode:false,
+  numTeams:10,budget:200,leagueName:'The League',benchCount:6,
+  rosterSlots:DEFAULT_SLOTS.map(s=>({...s})),
+  teamNames:Array.from({length:14},(_,i)=>`Team ${i+1}`),
+  teams:[],draftedMap:{},nomination:null,bidTeamId:'',bidAmount:1,
+});
+
+let S=INIT_STATE();
+let draftId=null;
+let unsub=null;
+
+// ── Firebase ───────────────────────────────────────────────────────────────
+function normalize(data){
+  return{
+    ...data,
+    rosterSlots:toArr(data.rosterSlots),
+    teamNames:toArr(data.teamNames),
+    teams:toArr(data.teams).map(t=>({...t,roster:toArr(t.roster)})),
+    draftedMap:data.draftedMap||{},
+    nomination:data.nomination||null,
+    bidTeamId:data.bidTeamId||'',
+    bidAmount:data.bidAmount||1,
+  };
+}
+
+async function push(){
+  if(!draftId)return;
+  const d={
+    phase:S.phase,view:S.view,presentMode:S.presentMode,
+    numTeams:S.numTeams,budget:S.budget,leagueName:S.leagueName,benchCount:S.benchCount,
+    rosterSlots:S.rosterSlots,teamNames:S.teamNames,
+    teams:S.teams,draftedMap:S.draftedMap,
+    nomination:S.nomination||null,bidTeamId:S.bidTeamId||'',bidAmount:S.bidAmount||1,
+  };
+  await set(ref(db,`drafts/${draftId}`),d);
+}
+
+function subscribe(){
+  if(unsub)unsub();
+  unsub=onValue(ref(db,`drafts/${draftId}`),snap=>{
+    const data=snap.val();
+    if(!data)return;
+    // preserve local-only UI state
+    const{search=S.search||'',posFilter=S.posFilter||'ALL',hideDrafted=S.hideDrafted!==undefined?S.hideDrafted:true}=S;
+    S={...normalize(data),search,posFilter,hideDrafted};
+    render();
+  });
+}
+
+// ── Mutations ──────────────────────────────────────────────────────────────
+function local(patch){S={...S,...patch};render()}  // search/filter only — no Firebase
+
+async function startDraft(){
+  draftId=genId();
+  setUrlId(draftId);
+  const teams=S.teamNames.slice(0,S.numTeams).map((name,i)=>({
+    id:'t'+i,name:(name&&name.trim())||`Team ${i+1}`,
+    color:TEAM_COLORS[i%TEAM_COLORS.length],budgetRemaining:S.budget,roster:[],
+  }));
+  S={...S,teams,draftedMap:{},nomination:null,bidTeamId:'',bidAmount:1,phase:'draft',view:'room',presentMode:false,search:'',posFilter:'ALL',hideDrafted:true};
+  await push();
+  subscribe();
+}
+
+async function newDraft(){
+  if(unsub){unsub();unsub=null}
+  draftId=null;clearUrlId();
+  S=INIT_STATE();render();
+}
+
+async function openNom(playerId){S={...S,nomination:playerId,bidTeamId:'',bidAmount:1};await push()}
+async function closeNom(){S={...S,nomination:null,bidTeamId:'',bidAmount:1};await push()}
+
+async function confirmSold(){
+  const{teams,nomination,bidTeamId,rosterSlots,benchCount}=S;
+  const team=teams.find(t=>t.id===bidTeamId);
+  if(!team||!nomination)return;
+  const sz=rosterSize(rosterSlots,benchCount);
+  const amt=Math.max(1,Math.min(S.bidAmount,maxBid(team,sz)));
+  S={...S,
+    teams:teams.map(t=>t.id!==team.id?t:{...t,budgetRemaining:t.budgetRemaining-amt,roster:[...toArr(t.roster),{playerId:nomination,price:amt}]}),
+    draftedMap:{...S.draftedMap,[nomination]:{teamId:team.id,price:amt}},
+    nomination:null,bidTeamId:'',bidAmount:1,
+  };
+  await push();
+}
+
+async function undoPick(teamId,playerId){
+  const teams=S.teams.map(t=>{
+    if(t.id!==teamId)return t;
+    const roster=toArr(t.roster);
+    const pick=roster.find(r=>r.playerId===playerId);
+    if(!pick)return t;
+    return{...t,budgetRemaining:t.budgetRemaining+pick.price,roster:roster.filter(r=>r.playerId!==playerId)};
+  });
+  const dm={...S.draftedMap};delete dm[playerId];
+  S={...S,teams,draftedMap:dm};
+  await push();
+}
+
+async function setView(v){S={...S,view:v};await push()}
+async function togglePresent(){S={...S,presentMode:!S.presentMode};await push()}
+
+// ── Render ─────────────────────────────────────────────────────────────────
+function render(){
+  document.getElementById('app').innerHTML=S.phase==='setup'?renderSetup():renderDraft();
+  bind();
+}
+
+function renderSetup(){
+  const starters=S.rosterSlots.reduce((a,s)=>a+s.count,0);
+  const sz=starters+S.benchCount;
+  return`
+<div style="max-width:760px;margin:40px auto">
+  <div class="eyebrow" style="margin-bottom:4px">AUCTION DRAFT ROOM</div>
+  <div style="font-family:'Yellowtail',cursive;font-size:30px;color:#E3B95F;line-height:1;margin-bottom:2px">the Draft</div>
+  <h1 style="font-family:'Alfa Slab One',serif;font-size:44px;font-weight:400;text-transform:uppercase;margin:8px 0 4px;color:#F2EAD3;line-height:1.05">Set the board.</h1>
+  <p style="color:#D9BE93;font-size:15px;margin-bottom:32px">This creates the draft everyone in your league will join and bid in together.</p>
+
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:28px">
+    <div>
+      <label class="lbl" style="margin-bottom:6px">Teams</label>
+      <select class="inp" id="sel-teams">
+        ${[6,7,8,9,10,11,12,13,14].map(n=>`<option value="${n}"${n===S.numTeams?' selected':''}>${n} teams</option>`).join('')}
+      </select>
+    </div>
+    <div>
+      <label class="lbl" style="margin-bottom:6px">Budget per team</label>
+      <input class="inp" id="inp-budget" type="number" min="1" value="${S.budget}">
+    </div>
+    <div>
+      <label class="lbl" style="margin-bottom:6px">League name</label>
+      <input class="inp" id="inp-league" type="text" value="${esc(S.leagueName)}" placeholder="e.g. The League">
+    </div>
+  </div>
+
+  <div style="margin-bottom:32px">
+    <label class="lbl" style="margin-bottom:8px">Starting roster spots</label>
+    <div id="slot-rows" style="display:flex;flex-direction:column;gap:8px;margin-top:8px">
+      ${S.rosterSlots.map(sl=>`
+        <div style="display:flex;gap:8px;align-items:center">
+          <select class="inp sl-type" data-id="${sl.id}" style="flex:1">
+            ${SLOT_TYPES.map(st=>`<option value="${st.key}"${st.key===sl.type?' selected':''}>${st.label}</option>`).join('')}
+          </select>
+          <input class="inp sl-count" data-id="${sl.id}" type="number" min="0" value="${sl.count}" style="width:70px">
+          <button class="btn-ghost sl-remove" data-id="${sl.id}">Remove</button>
+        </div>`).join('')}
+    </div>
+    <button class="btn-ghost" id="btn-add-slot" style="margin-top:8px">+ Add slot</button>
+    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:16px;margin-top:12px">
+      <div>
+        <label class="lbl" style="margin-bottom:6px">Bench spots</label>
+        <input class="inp" id="inp-bench" type="number" min="0" value="${S.benchCount}">
+      </div>
+      <div>
+        <label class="lbl" style="margin-bottom:6px">Total roster size</label>
+        <div class="inp" style="color:#D9BE93">${starters} starters + ${S.benchCount} bench = ${sz}</div>
+      </div>
+    </div>
+  </div>
+
+  <div style="margin-bottom:32px">
+    <label class="lbl" style="margin-bottom:8px">Team names</label>
+    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-top:8px">
+      ${S.teamNames.slice(0,S.numTeams).map((name,i)=>`
+        <input class="inp team-name" data-i="${i}" value="${esc(name)}" placeholder="Team name"
+          style="border-left:4px solid ${TEAM_COLORS[i%TEAM_COLORS.length]}">`).join('')}
+    </div>
+  </div>
+
+  <button class="btn-primary" id="btn-start">Start Draft →</button>
+  <div style="margin-top:16px;font-size:12px;color:#AE8B5E">Sample NFL player pool included. Anyone with the link can view the board; you run the picks.</div>
+</div>`;
+}
+
+function renderDraft(){
+  const sz=rosterSize(S.rosterSlots,S.benchCount);
+  const totalDrafted=Object.keys(S.draftedMap).length;
+  const totalSpots=S.teams.length*sz;
+  const{view,presentMode}=S;
+  const tabs=['room','board','rosters'].map(v=>`
+    <button class="tab ${view===v?'tab-on':'tab-off'}" data-view="${v}">
+      ${v==='room'?'Draft Room':v==='board'?'Draft Board':'Rosters'}
+    </button>`).join('');
+
+  const shareBar=draftId?`
+    <div class="share-bar">
+      <span class="eyebrow-sm">SHARE</span>
+      <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px">${esc(location.href)}</span>
+      <button class="btn-ghost" id="btn-copy" style="padding:4px 10px;font-size:12px;white-space:nowrap">Copy link</button>
+    </div>`:'';
+
+  return`
+<div>
+  ${shareBar}
+  <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #8A5F35;padding-bottom:16px;margin-bottom:16px;flex-wrap:wrap;gap:12px">
+    <div style="display:flex;align-items:baseline;gap:16px">
+      <span class="eyebrow-sm">LIVE DRAFT</span>
+      <span style="font-family:'Special Elite',monospace;font-size:13px;color:#D9BE93">${totalDrafted} / ${totalSpots} picks made</span>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      ${tabs}
+      <button class="btn-ghost" id="btn-new-draft">New Draft</button>
+    </div>
+  </div>
+  ${renderPlacard(sz)}
+  ${view==='room'?renderRoom(sz):''}
+  ${view==='board'?renderBoard(sz):''}
+  ${view==='rosters'?renderRosters():''}
+</div>`;
+}
+
+function renderPlacard(sz){
+  if(!S.nomination)return'';
+  const p=PLAYER_BY_ID[S.nomination];if(!p)return'';
+  const selTeam=S.teams.find(t=>t.id===S.bidTeamId);
+  const selMax=selTeam?maxBid(selTeam,sz):0;
+  const disableSold=!S.bidTeamId||S.bidAmount<1||S.bidAmount>selMax;
+  const opts=S.teams.map(t=>{
+    const rem=sz-toArr(t.roster).length;
+    const full=rem<=0;
+    return`<option value="${t.id}"${full?' disabled':''}${t.id===S.bidTeamId?' selected':''}>${esc(t.name)} (${$m(t.budgetRemaining)} left${full?', full':''})</option>`;
+  }).join('');
+  return`
+<div class="placard" style="margin-bottom:20px;display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:16px">
+  <div>
+    <div style="font-family:'Special Elite',monospace;font-size:11px;letter-spacing:3px;color:#7A1F1F;font-weight:700;text-transform:uppercase;margin-bottom:6px">Now at the podium</div>
+    <div style="font-family:'Alfa Slab One',serif;font-size:34px;color:#231A12;line-height:1.05">${esc(p.name)}</div>
+    <div style="color:#6B5638;font-size:13px;margin-top:4px;letter-spacing:2px;text-transform:uppercase">${p.pos} · ${p.team}</div>
+  </div>
+  <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+    <select class="plac-inp" id="sel-team">
+      <option value="">Winning team…</option>${opts}
+    </select>
+    <input class="plac-inp" id="inp-bid" type="number" min="1" value="${S.bidAmount}"
+      style="width:96px;font-weight:700;font-size:20px;color:#7A1F1F;font-family:'Alfa Slab One',serif"
+      ${!S.bidTeamId?'disabled':''}>
+    <button class="btn-sold" id="btn-sold"${disableSold?' disabled':''}>Sold!</button>
+    <button class="btn-cancel-plac" id="btn-cancel">Cancel</button>
+  </div>
+</div>`;
+}
+
+function renderRoom(sz){
+  const{draftedMap,search,posFilter,hideDrafted,teams}=S;
+  const q=search.trim().toLowerCase();
+  const showPrompt=!q&&posFilter==='ALL';
+  let filtered=[];
+  if(!showPrompt){
+    filtered=PLAYERS
+      .filter(p=>posFilter==='ALL'||p.pos===posFilter)
+      .filter(p=>!q||p.name.toLowerCase().includes(q))
+      .filter(p=>!hideDrafted||!draftedMap[p.id])
+      .slice(0,100);
+  }
+  const noMatch=!showPrompt&&filtered.length===0;
+
+  const chips=['ALL',...POSITIONS].map(p=>`
+    <button class="chip ${posFilter===p?'chip-on':'chip-off'}" data-pos="${p}">${p}</button>`).join('');
+
+  const rows=filtered.map(p=>{
+    const dr=draftedMap[p.id];
+    const drTeam=dr&&teams.find(t=>t.id===dr.teamId);
+    const bye=BYE[p.team];
+    const drafted=!!dr;
+    return`
+<div class="prow ${drafted?'prow-drafted':'prow-avail'}">
+  <span style="font-family:'Special Elite',monospace;font-size:11px;color:#E3B95F;font-weight:700">${p.pos}</span>
+  <span style="font-size:14px;color:#F2EAD3;${drafted?'text-decoration:line-through':''}">${esc(p.name)}</span>
+  <span style="font-size:12px;color:#D9BE93;font-family:'Special Elite',monospace">${p.team}</span>
+  <span style="font-size:11px;color:#AE8B5E;font-family:'Special Elite',monospace">${bye?'Bye '+bye:'—'}</span>
+  ${drafted
+    ?`<span style="font-size:12px;font-family:'Special Elite',monospace;font-weight:700;text-align:right;color:${drTeam?.color||'#D9BE93'}">${esc(drTeam?.name||'')} · ${$m(dr.price)}</span>`
+    :`<button class="btn-nom nom-btn" data-pid="${p.id}">Nominate</button>`}
+</div>`;
+  }).join('');
+
+  const cards=teams.map(t=>{
+    const rem=sz-toArr(t.roster).length;
+    return`
+<div class="team-card" style="border-top:3px solid ${t.color}">
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+    <span style="width:8px;height:8px;border-radius:50%;background:${t.color};display:inline-block;flex-shrink:0"></span>
+    <span style="font-family:'Saira Condensed',sans-serif;font-size:15px;font-weight:600;text-transform:uppercase;color:#F2EAD3">${esc(t.name)}</span>
+  </div>
+  <div style="display:flex;justify-content:space-between">
+    <div><div style="font-size:9px;letter-spacing:1px;color:#AE8B5E">BUDGET LEFT</div><div style="font-family:'Special Elite',monospace;font-size:14px;font-weight:700;color:#E3B95F">${$m(t.budgetRemaining)}</div></div>
+    <div><div style="font-size:9px;letter-spacing:1px;color:#AE8B5E">MAX BID</div><div style="font-family:'Special Elite',monospace;font-size:14px;font-weight:700;color:#F2EAD3">${$m(maxBid(t,sz))}</div></div>
+    <div><div style="font-size:9px;letter-spacing:1px;color:#AE8B5E">SLOTS</div><div style="font-family:'Special Elite',monospace;font-size:14px;font-weight:700;color:#F2EAD3">${rem}/${sz}</div></div>
+  </div>
+</div>`;
+  }).join('');
+
+  return`
+<div style="display:grid;grid-template-columns:1fr 320px;gap:20px" class="room-grid">
+  <div class="panel">
+    <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:12px">
+      <input class="inp" id="inp-search" placeholder="Search players by name…" value="${esc(search)}" style="flex:1 1 220px">
+      <div style="display:flex;gap:4px;flex-wrap:wrap">${chips}</div>
+      <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#D9BE93;cursor:pointer">
+        <input type="checkbox" id="cb-hide"${hideDrafted?' checked':''}> Hide drafted
+      </label>
+    </div>
+    ${showPrompt?'<div style="color:#D9BE93;font-size:13px;padding:16px 4px">Search a name or pick a position to browse the pool.</div>':''}
+    ${noMatch?'<div style="color:#D9BE93;font-size:13px;padding:16px 4px">No matching players.</div>':''}
+    <div style="max-height:520px;overflow-y:auto;display:flex;flex-direction:column;gap:4px">${rows}</div>
+  </div>
+  <div style="display:flex;flex-direction:column;gap:10px;max-height:700px;overflow-y:auto">${cards}</div>
+</div>`;
+}
+
+function renderBoard(sz){
+  const{teams,presentMode}=S;
+  const cols=teams.map(t=>{
+    const roster=toArr(t.roster);
+    const picks=roster.map(pick=>{
+      const p=PLAYER_BY_ID[pick.playerId];if(!p)return'';
+      return`
+<div class="board-pick">
+  <div style="font-size:12.5px;font-weight:600;color:#F2EAD3;padding-right:28px">${esc(p.name)}</div>
+  <div style="display:flex;justify-content:space-between;font-size:10.5px;color:#D9BE93;font-family:'Special Elite',monospace">
+    <span>${p.pos} · ${p.team}</span><span style="color:#E3B95F;font-weight:700">${$m(pick.price)}</span>
+  </div>
+  <button class="undo-btn" data-tid="${t.id}" data-pid="${pick.playerId}"
+    style="position:absolute;top:4px;right:6px;background:transparent;border:none;color:#AE8B5E;font-size:10px;cursor:pointer;font-family:'Special Elite',monospace;padding:2px">undo</button>
+</div>`;
+    }).join('');
+    const empties=Array.from({length:Math.max(0,sz-roster.length)}).map(()=>'<div class="board-empty"></div>').join('');
+    return`
+<div style="background:#5A3819;border:1px solid #8A5F35;border-radius:3px;overflow:hidden;display:flex;flex-direction:column">
+  <div style="padding:10px 12px;background:${t.color};color:#F7EFDA">
+    <div style="font-family:'Saira Condensed',sans-serif;font-size:15px;font-weight:700;text-transform:uppercase">${esc(t.name)}</div>
+    <div style="font-family:'Special Elite',monospace;font-size:12px;font-weight:700">${$m(t.budgetRemaining)} left</div>
+  </div>
+  <div style="display:flex;flex-direction:column;gap:4px;padding:8px">${picks}${empties}</div>
+</div>`;
+  }).join('');
+
+  const wrapStyle=presentMode
+    ?'position:fixed;inset:0;background:radial-gradient(120% 80% at 15% 0%,#7A5029 0%,#5E3B1D 45%,#3F2611 100%);z-index:1000;padding:24px;overflow:auto'
+    :'';
+  return`
+<div style="${wrapStyle}">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+    <span class="eyebrow-sm">DRAFT BOARD</span>
+    <button class="btn-ghost" id="btn-present">${presentMode?'Exit Present Mode':'Present Mode (for projector)'}</button>
+  </div>
+  <div style="display:grid;gap:10px;grid-template-columns:repeat(${Math.max(teams.length,1)},minmax(180px,1fr));overflow-x:auto">
+    ${cols}
+  </div>
+</div>`;
+}
+
+function renderRosters(){
+  const{teams,rosterSlots,benchCount}=S;
+  const buildRows=(count,filled)=>Array.from({length:count},(_,i)=>{
+    const item=filled[i];
+    return item
+      ?`<div class="rost-filled"><span>${esc(item.p.name)}</span><span style="color:#E3B95F;font-weight:700">${$m(item.pick.price)}</span></div>`
+      :`<div class="rost-empty">Open</div>`;
+  }).join('');
+
+  const cards=teams.map(t=>{
+    const{slots,bench}=buildAssignment(t,rosterSlots,benchCount);
+    const groups=slots.map(sl=>`
+<div style="margin-top:10px">
+  <div style="font-family:'Special Elite',monospace;font-size:10px;letter-spacing:1px;color:#AE8B5E;margin-bottom:4px">${sl.def.label}</div>
+  ${buildRows(sl.count,sl.filled)}
+</div>`).join('');
+    return`
+<div style="background:#5A3819;border:1px solid #8A5F35;border-top:3px solid ${t.color};border-radius:3px;padding:12px">
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+    <span style="width:8px;height:8px;border-radius:50%;background:${t.color};display:inline-block;flex-shrink:0"></span>
+    <span style="font-family:'Saira Condensed',sans-serif;font-size:15px;font-weight:600;text-transform:uppercase;color:#F2EAD3">${esc(t.name)}</span>
+  </div>
+  ${groups}
+  <div style="margin-top:10px">
+    <div style="font-family:'Special Elite',monospace;font-size:10px;letter-spacing:1px;color:#AE8B5E;margin-bottom:4px">BENCH</div>
+    ${buildRows(benchCount,bench)}
+  </div>
+</div>`;
+  }).join('');
+
+  return`<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px">${cards}</div>`;
+}
+
+// ── Event binding ──────────────────────────────────────────────────────────
+function bind(){
+  const g=id=>document.getElementById(id);
+  const all=sel=>[...document.querySelectorAll(sel)];
+
+  // Setup
+  g('sel-teams')?.addEventListener('change',e=>{
+    const n=Number(e.target.value);
+    const names=[...S.teamNames];
+    while(names.length<n)names.push(`Team ${names.length+1}`);
+    S={...S,numTeams:n,teamNames:names};render();
+  });
+  g('inp-budget')?.addEventListener('change',e=>{S={...S,budget:Number(e.target.value)||1};render()});
+  g('inp-league')?.addEventListener('input',e=>{S={...S,leagueName:e.target.value}});
+  g('inp-bench')?.addEventListener('change',e=>{S={...S,benchCount:Number(e.target.value)||0};render()});
+  all('.sl-type').forEach(el=>el.addEventListener('change',e=>{
+    const id=e.target.dataset.id;
+    S={...S,rosterSlots:S.rosterSlots.map(s=>s.id===id?{...s,type:e.target.value}:s)};render();
+  }));
+  all('.sl-count').forEach(el=>el.addEventListener('change',e=>{
+    const id=e.target.dataset.id;
+    S={...S,rosterSlots:S.rosterSlots.map(s=>s.id===id?{...s,count:Number(e.target.value)||0}:s)};render();
+  }));
+  all('.sl-remove').forEach(el=>el.addEventListener('click',e=>{
+    const id=e.target.dataset.id;
+    S={...S,rosterSlots:S.rosterSlots.filter(s=>s.id!==id)};render();
+  }));
+  g('btn-add-slot')?.addEventListener('click',()=>{
+    S={...S,rosterSlots:[...S.rosterSlots,{id:'s'+Date.now(),type:'RB',count:1}]};render();
+  });
+  all('.team-name').forEach(el=>el.addEventListener('input',e=>{
+    const i=Number(e.target.dataset.i);
+    const names=[...S.teamNames];names[i]=e.target.value;S={...S,teamNames:names};
+  }));
+  g('btn-start')?.addEventListener('click',startDraft);
+
+  // Draft header
+  all('[data-view]').forEach(el=>el.addEventListener('click',e=>setView(e.currentTarget.dataset.view)));
+  g('btn-new-draft')?.addEventListener('click',newDraft);
+  g('btn-copy')?.addEventListener('click',e=>{
+    navigator.clipboard.writeText(location.href).catch(()=>{});
+    e.target.textContent='Copied!';
+    setTimeout(()=>{if(g('btn-copy'))g('btn-copy').textContent='Copy link'},2000);
+  });
+
+  // Placard
+  g('sel-team')?.addEventListener('change',e=>{S={...S,bidTeamId:e.target.value,bidAmount:1};render()});
+  g('inp-bid')?.addEventListener('input',e=>{
+    S={...S,bidAmount:Number(e.target.value)||1};
+    // update sold button without full re-render
+    const selTeam=S.teams.find(t=>t.id===S.bidTeamId);
+    const sz=rosterSize(S.rosterSlots,S.benchCount);
+    const mx=selTeam?maxBid(selTeam,sz):0;
+    const btn=g('btn-sold');
+    if(btn)btn.disabled=!S.bidTeamId||S.bidAmount<1||S.bidAmount>mx;
+  });
+  g('btn-sold')?.addEventListener('click',confirmSold);
+  g('btn-cancel')?.addEventListener('click',closeNom);
+
+  // Room
+  g('inp-search')?.addEventListener('input',e=>local({search:e.target.value}));
+  all('[data-pos]').forEach(el=>el.addEventListener('click',e=>local({posFilter:e.currentTarget.dataset.pos})));
+  g('cb-hide')?.addEventListener('change',e=>local({hideDrafted:e.target.checked}));
+  all('.nom-btn').forEach(el=>el.addEventListener('click',e=>openNom(e.currentTarget.dataset.pid)));
+
+  // Board
+  all('.undo-btn').forEach(el=>el.addEventListener('click',e=>{
+    const{tid,pid}=e.currentTarget.dataset;undoPick(tid,pid);
+  }));
+  g('btn-present')?.addEventListener('click',togglePresent);
+}
+
+// ── Init ───────────────────────────────────────────────────────────────────
+async function init(){
+  const id=urlId();
+  if(id){
+    draftId=id;
+    const snap=await get(ref(db,`drafts/${id}`));
+    const data=snap.val();
+    if(data)S={...S,...normalize(data)};
+    subscribe();
+  }
+  render();
+}
+
+init();
+</script>
+</body>
+</html>
