@@ -68,7 +68,10 @@ select.plac-inp option{background:#EDE3CC;color:#231A12}
 .board-pick{background:#6B4423;border-radius:5px;padding:6px 8px;position:relative}
 .board-empty{border:1px dashed #8A5F35;border-radius:5px;height:30px}
 
-.rost-filled{display:flex;justify-content:space-between;font-size:13px;background:#6B4423;border-radius:5px;padding:6px 8px;margin-bottom:3px;color:#F2EAD3}
+.rost-filled{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:13px;background:#6B4423;border-radius:5px;padding:7px 9px;margin-bottom:3px;color:#F2EAD3}
+.rost-filled-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rost-filled-tag{color:#AE8B5E;font-size:11px;font-family:'Special Elite',monospace;margin-left:6px}
+.rost-filled-price{flex-shrink:0;color:#E3B95F;font-weight:700}
 .rost-empty{font-size:12px;color:#AE8B5E;border:1px dashed #8A5F35;border-radius:5px;padding:6px 8px;margin-bottom:3px}
 
 .share-bar{background:rgba(0,0,0,0.2);border:1px solid #8A5F35;border-radius:3px;padding:10px 14px;font-size:12px;color:#D9BE93;display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap}
@@ -659,7 +662,7 @@ function renderRosters(){
   const buildRows=(count,filled)=>Array.from({length:count},(_,i)=>{
     const item=filled[i];
     return item
-      ?`<div class="rost-filled"><span>${esc(item.p.name)}</span><span style="color:#E3B95F;font-weight:700">${$m(item.pick.price)}</span></div>`
+      ?`<div class="rost-filled"><span class="rost-filled-name">${esc(item.p.name)}<span class="rost-filled-tag">${item.p.pos}${item.p.bye?' (Bye '+item.p.bye+')':''}</span></span><span class="rost-filled-price">${$m(item.pick.price)}</span></div>`
       :`<div class="rost-empty">Open</div>`;
   }).join('');
 
@@ -684,7 +687,7 @@ function renderRosters(){
 </div>`;
   }).join('');
 
-  return`<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px">${cards}</div>`;
+  return`<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px">${cards}</div>`;
 }
 
 function renderCommLogin(){
