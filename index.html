@@ -191,7 +191,7 @@ function rosterSize(slots,bench){
 function maxBid(team,sz){
   const rem=sz-toArr(team.roster).length;
   if(rem<=0)return 0;
-  return Math.max(0,team.budgetRemaining-(rem-1));
+  return Math.max(0,team.budgetRemaining);
 }
 
 function buildAssignment(team,slots,bench){
