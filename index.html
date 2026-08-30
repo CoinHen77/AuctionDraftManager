@@ -194,6 +194,19 @@ function maxBid(team,sz){
   return Math.max(0,team.budgetRemaining);
 }
 
+// Snake nomination order, derived from picks made so far (no separate synced
+// turn state needed — stays correct automatically across undo).
+function nominatingTeamId(){
+  const{teams,draftedMap}=S;
+  const n=teams.length;
+  if(!n)return null;
+  const count=Object.keys(draftedMap||{}).length;
+  const round=Math.floor(count/n);
+  const pos=count%n;
+  const idx=round%2===0?pos:(n-1-pos);
+  return teams[idx].id;
+}
+
 function buildAssignment(team,slots,bench){
   const working=toArr(slots).map(s=>({...s,def:slotDef(s.type),filled:[]}));
   const order=[...working].sort((a,b)=>a.def.positions.length-b.def.positions.length);
@@ -543,13 +556,16 @@ function renderRoom(sz){
 </div>`;
   }).join('');
 
+  const onClockId=nominatingTeamId();
   const cards=teams.map(t=>{
     const rem=sz-toArr(t.roster).length;
+    const onClock=t.id===onClockId;
     return`
-<div class="team-card" style="border-top:3px solid ${t.color}">
+<div class="team-card" style="border-top:3px solid ${t.color}${onClock?';outline:2px solid #E3B95F;outline-offset:-1px;box-shadow:0 0 10px #E3B95F80':''}">
   <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
     <span style="width:8px;height:8px;border-radius:50%;background:${t.color};display:inline-block;flex-shrink:0"></span>
     <span style="font-family:'Saira Condensed',sans-serif;font-size:15px;font-weight:600;text-transform:uppercase;color:#F2EAD3">${esc(t.name)}</span>
+    ${onClock?`<span style="font-family:'Special Elite',monospace;font-size:9px;letter-spacing:1px;color:#E3B95F;font-weight:700;margin-left:auto">● ON THE CLOCK</span>`:''}
   </div>
   <div style="display:flex;justify-content:space-between">
     <div><div style="font-size:11px;letter-spacing:1px;color:#AE8B5E;margin-bottom:4px">BUDGET LEFT</div><div style="font-family:'Special Elite',monospace;font-size:15px;font-weight:700;color:#E3B95F">${$m(t.budgetRemaining)}</div></div>
@@ -595,7 +611,9 @@ function renderBoard(sz){
   const gapPx=n>10?6:10;
   const padPx=n>10?5:8;
 
+  const onClockId=nominatingTeamId();
   const cols=teams.map(t=>{
+    const onClock=t.id===onClockId;
     const roster=toArr(t.roster);
     const picks=roster.map(pick=>{
       const p=PLAYER_BY_ID[pick.playerId];if(!p)return'';
@@ -611,8 +629,9 @@ function renderBoard(sz){
     }).join('');
     const empties=Array.from({length:Math.max(0,sz-roster.length)}).map(()=>'<div class="board-empty"></div>').join('');
     return`
-<div style="background:#5A3819;border:1px solid #8A5F35;border-radius:3px;overflow:hidden;display:flex;flex-direction:column;min-width:0">
-  <div style="padding:8px 10px;background:${t.color};color:#F7EFDA">
+<div style="background:#5A3819;border:${onClock?'3px solid #E3B95F':'1px solid #8A5F35'};border-radius:3px;overflow:hidden;display:flex;flex-direction:column;min-width:0${onClock?';box-shadow:0 0 10px #E3B95F80':''}">
+  <div style="padding:8px 10px;background:${t.color};color:#F7EFDA;position:relative">
+    ${onClock?`<div style="font-family:'Special Elite',monospace;font-size:9px;letter-spacing:2px;color:#E3B95F;font-weight:700;margin-bottom:2px">● ON THE CLOCK</div>`:''}
     <div style="font-family:'Saira Condensed',sans-serif;font-size:${hdNameFz}px;font-weight:700;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(t.name)}</div>
     <div style="font-family:'Special Elite',monospace;font-size:${hdBudgetFz}px;font-weight:700">${$m(t.budgetRemaining)} left</div>
   </div>
