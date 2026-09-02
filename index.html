@@ -53,7 +53,7 @@ select.inp option{background:#3B2411;color:#F2EAD3}
 .chip-off{background:transparent;color:#D9BE93;border-color:#8A5F35}
 .chip-off:hover{border-color:#D9BE93}
 
-.prow{display:grid;grid-template-columns:44px 1fr 56px 64px auto;align-items:center;gap:10px;padding:8px 10px;border-radius:2px}
+.prow{display:grid;grid-template-columns:40px 1fr 110px auto;align-items:center;gap:10px;padding:8px 10px;border-radius:2px}
 .prow-avail{background:#6B4423}
 .prow-drafted{background:rgba(63,38,17,0.6);opacity:0.55}
 
@@ -76,7 +76,37 @@ select.plac-inp option{background:#EDE3CC;color:#231A12}
 
 .share-bar{background:rgba(0,0,0,0.2);border:1px solid #8A5F35;border-radius:3px;padding:10px 14px;font-size:12px;color:#D9BE93;display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap}
 
+.grid-3{display:grid;grid-template-columns:repeat(3,1fr)}
+.grid-2{display:grid;grid-template-columns:repeat(2,1fr)}
+.board-grid{display:grid;grid-template-columns:repeat(var(--cols),1fr)}
+.board-grid-present{flex:1;overflow:hidden}
+
 @media(max-width:1000px){.room-grid{grid-template-columns:1fr !important}}
+
+@media(max-width:900px){
+  .board-grid{grid-template-columns:none;grid-auto-flow:column;grid-auto-columns:minmax(150px,1fr);overflow-x:auto;-webkit-overflow-scrolling:touch;scroll-snap-type:x proximity;padding-bottom:6px}
+  .board-grid>div{scroll-snap-align:start}
+  .board-grid-present{overflow-x:auto;overflow-y:hidden}
+  .board-name{font-size:13px !important}
+  .board-detail{font-size:11px !important}
+  .board-hd-name{font-size:15px !important}
+  .board-hd-budget{font-size:13px !important}
+}
+
+@media(max-width:640px){
+  #app{padding:12px}
+  .panel{padding:12px}
+  .grid-3,.grid-2{grid-template-columns:1fr}
+  .inp,select.inp,.plac-inp,select.plac-inp{font-size:16px}
+  select.plac-inp{min-width:0;width:100%}
+  .placard{padding:14px 16px}
+  .chip,.btn-nom{padding:8px 12px}
+  .prow{grid-template-columns:22px 1fr auto;column-gap:8px;row-gap:2px;padding:8px 10px}
+  .prow-pos{grid-row:1;grid-column:1}
+  .prow-name{grid-row:1;grid-column:2}
+  .prow-meta{grid-row:2;grid-column:2;font-size:10px !important}
+  .prow-action{grid-row:1 / span 2;grid-column:3;align-self:center}
+}
 </style>
 </head>
 <body>
@@ -197,17 +227,24 @@ function maxBid(team,sz){
   return Math.max(0,team.budgetRemaining);
 }
 
-// Snake nomination order, derived from picks made so far (no separate synced
-// turn state needed — stays correct automatically across undo).
+// Snake nomination order, derived from picks made so far plus any manual
+// skips (no separate synced turn-pointer state needed — stays correct
+// automatically across undo). Teams with a full roster are stepped over.
 function nominatingTeamId(){
-  const{teams,draftedMap}=S;
+  const{teams,draftedMap,rosterSlots,benchCount}=S;
   const n=teams.length;
   if(!n)return null;
-  const count=Object.keys(draftedMap||{}).length;
-  const round=Math.floor(count/n);
-  const pos=count%n;
-  const idx=round%2===0?pos:(n-1-pos);
-  return teams[idx].id;
+  const sz=rosterSize(rosterSlots,benchCount);
+  let count=Object.keys(draftedMap||{}).length+(S.nomSkips||0);
+  for(let i=0;i<n;i++){
+    const round=Math.floor(count/n);
+    const pos=count%n;
+    const idx=round%2===0?pos:(n-1-pos);
+    const team=teams[idx];
+    if(sz-toArr(team.roster).length>0)return team.id;
+    count++;
+  }
+  return null; // every team's roster is full — draft complete
 }
 
 function buildAssignment(team,slots,bench){
@@ -234,7 +271,7 @@ const INIT_STATE=()=>({
   numTeams:10,budget:200,leagueName:'The League',benchCount:6,commissionerCode:'',
   rosterSlots:DEFAULT_SLOTS.map(s=>({...s})),
   teamNames:Array.from({length:14},(_,i)=>`Team ${i+1}`),
-  teams:[],draftedMap:{},nomination:null,bidTeamId:'',bidAmount:1,
+  teams:[],draftedMap:{},nomination:null,bidTeamId:'',bidAmount:1,nomSkips:0,
   search:'',posFilter:'ALL',hideDrafted:true,sortOrder:'rank',
 });
 
@@ -244,6 +281,7 @@ let unsub=null;
 let isCommissioner=false;
 let commLoginOpen=false;
 let commLoginError=false;
+let exportOpen=false;
 
 // ── Firebase ───────────────────────────────────────────────────────────────
 function normalize(data){
@@ -257,6 +295,7 @@ function normalize(data){
     nomination:data.nomination||null,
     bidTeamId:data.bidTeamId||'',
     bidAmount:data.bidAmount||1,
+    nomSkips:data.nomSkips||0,
   };
 }
 
@@ -267,7 +306,7 @@ async function push(){
     numTeams:S.numTeams,budget:S.budget,leagueName:S.leagueName,benchCount:S.benchCount,commissionerCode:S.commissionerCode||'',
     rosterSlots:S.rosterSlots,teamNames:S.teamNames,
     teams:S.teams,draftedMap:S.draftedMap,
-    nomination:S.nomination||null,bidTeamId:S.bidTeamId||'',bidAmount:S.bidAmount||1,
+    nomination:S.nomination||null,bidTeamId:S.bidTeamId||'',bidAmount:S.bidAmount||1,nomSkips:S.nomSkips||0,
   };
   await set(ref(db,`drafts/${draftId}`),d);
 }
@@ -297,7 +336,7 @@ function startDraft(){
     id:'t'+i,name:(name&&name.trim())||`Team ${i+1}`,
     color:TEAM_COLORS[i%TEAM_COLORS.length],budgetRemaining:S.budget,roster:[],
   }));
-  S={...S,teams,draftedMap:{},nomination:null,bidTeamId:'',bidAmount:1,phase:'draft',view:'room',presentMode:false,search:'',posFilter:'ALL',hideDrafted:true,sortOrder:'rank'};
+  S={...S,teams,draftedMap:{},nomination:null,bidTeamId:'',bidAmount:1,nomSkips:0,phase:'draft',view:'room',presentMode:false,search:'',posFilter:'ALL',hideDrafted:true,sortOrder:'rank'};
   render();
   push().then(()=>subscribe()).catch(console.error);
 }
@@ -311,6 +350,7 @@ function newDraft(){
 
 function openNom(playerId){commit({nomination:playerId,bidTeamId:'',bidAmount:1})}
 function closeNom(){commit({nomination:null,bidTeamId:'',bidAmount:1})}
+function skipNomination(){commit({nomSkips:(S.nomSkips||0)+1})}
 
 function confirmSold(){
   const{teams,nomination,bidTeamId,rosterSlots,benchCount}=S;
@@ -356,7 +396,7 @@ function renderSetup(){
   <h1 style="font-family:'Alfa Slab One',serif;font-size:44px;font-weight:400;text-transform:uppercase;margin:8px 0 4px;color:#F2EAD3;line-height:1.05">Set the board.</h1>
   <p style="color:#D9BE93;font-size:15px;margin-bottom:32px">This creates the draft everyone in your league will join and bid in together.</p>
 
-  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:28px">
+  <div class="grid-3" style="gap:16px;margin-bottom:28px">
     <div>
       <label class="lbl" style="margin-bottom:6px">Teams</label>
       <select class="inp" id="sel-teams">
@@ -386,7 +426,7 @@ function renderSetup(){
         </div>`).join('')}
     </div>
     <button class="btn-ghost" id="btn-add-slot" style="margin-top:8px">+ Add slot</button>
-    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:16px;margin-top:12px">
+    <div class="grid-2" style="gap:16px;margin-top:12px">
       <div>
         <label class="lbl" style="margin-bottom:6px">Bench spots</label>
         <input class="inp" id="inp-bench" type="number" min="0" value="${S.benchCount}">
@@ -400,7 +440,7 @@ function renderSetup(){
 
   <div style="margin-bottom:32px">
     <label class="lbl" style="margin-bottom:8px">Team names</label>
-    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-top:8px">
+    <div class="grid-2" style="gap:10px;margin-top:8px">
       ${S.teamNames.slice(0,S.numTeams).map((name,i)=>`
         <input class="inp team-name" data-i="${i}" value="${esc(name)}" placeholder="Team name"
           style="border-left:4px solid ${TEAM_COLORS[i%TEAM_COLORS.length]}">`).join('')}
@@ -444,53 +484,65 @@ function renderDraft(){
 <div>
   ${shareBar}
   <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #8A5F35;padding-bottom:16px;margin-bottom:16px;flex-wrap:wrap;gap:12px">
-    <div style="display:flex;align-items:baseline;gap:16px">
+    <div style="display:flex;align-items:baseline;gap:14px;flex-wrap:wrap">
+      <span style="font-family:'Alfa Slab One',serif;font-size:19px;color:#F2EAD3;text-transform:uppercase;letter-spacing:0.5px">${esc(S.leagueName||'The League')}</span>
       <span class="eyebrow-sm">LIVE DRAFT</span>
       <span style="font-family:'Special Elite',monospace;font-size:13px;color:#D9BE93">${totalDrafted} / ${totalSpots} picks made</span>
     </div>
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
       ${tabs}
       ${commBadge}
+      <button class="btn-ghost" id="btn-export">Export</button>
       <button class="btn-ghost" id="btn-new-draft">New Draft</button>
     </div>
   </div>
-  ${renderPlacard(sz)}
+  ${view!=='board'?renderNomBanner(sz):''}
   ${view==='room'?renderRoom(sz):''}
   ${view==='board'?renderBoard(sz):''}
   ${view==='rosters'?renderRosters():''}
   ${commLoginOpen?renderCommLogin():''}
+  ${exportOpen?renderExport():''}
 </div>`;
 }
 
-function renderPlacard(sz){
-  if(!S.nomination)return'';
-  const p=PLAYER_BY_ID[S.nomination];if(!p)return'';
-  const canControl=isCommissioner||!S.commissionerCode;
-  if(!canControl){
-    return`
-<div class="placard" style="margin-bottom:20px;display:flex;align-items:center;gap:24px;flex-wrap:wrap">
+// Shared nomination status banner. Used full-size in Draft Room/Rosters, and
+// compact (with controls suppressed in Present Mode) inside the Draft Board.
+function renderNomBanner(sz,{compact=false,readOnly=false}={}){
+  if(!S.teams.length)return'';
+  const canControl=(isCommissioner||!S.commissionerCode)&&!readOnly;
+  const mb=compact?'10px':'20px';
+  const pad=compact?'12px 16px':'20px 24px';
+  const eyebrowFz=compact?10:11;
+  const nameFz=compact?22:34;
+  const subFz=compact?12:13;
+
+  if(S.nomination){
+    const p=PLAYER_BY_ID[S.nomination];if(!p)return'';
+    if(!canControl){
+      return`
+<div class="placard" style="margin-bottom:${mb};padding:${pad};display:flex;align-items:center;gap:24px;flex-wrap:wrap">
   <div>
-    <div style="font-family:'Special Elite',monospace;font-size:11px;letter-spacing:3px;color:#7A1F1F;font-weight:700;text-transform:uppercase;margin-bottom:6px">Now at the podium</div>
-    <div style="font-family:'Alfa Slab One',serif;font-size:34px;color:#231A12;line-height:1.05">${esc(p.name)}</div>
-    <div style="color:#6B5638;font-size:13px;margin-top:4px;letter-spacing:2px;text-transform:uppercase">${p.pos} · ${p.team}</div>
+    <div style="font-family:'Special Elite',monospace;font-size:${eyebrowFz}px;letter-spacing:3px;color:#7A1F1F;font-weight:700;text-transform:uppercase;margin-bottom:4px">Now bidding</div>
+    <div style="font-family:'Alfa Slab One',serif;font-size:${nameFz}px;color:#231A12;line-height:1.05">${esc(p.name)}</div>
+    <div style="color:#6B5638;font-size:${subFz}px;margin-top:2px;letter-spacing:2px;text-transform:uppercase">${p.pos} · ${p.team}</div>
   </div>
-  <div style="font-family:'Special Elite',monospace;font-size:13px;letter-spacing:3px;color:#7A1F1F;font-weight:700;text-transform:uppercase">BIDDING IN PROGRESS…</div>
+  <div style="font-family:'Special Elite',monospace;font-size:${compact?11:13}px;letter-spacing:3px;color:#7A1F1F;font-weight:700;text-transform:uppercase">BIDDING IN PROGRESS…</div>
 </div>`;
-  }
-  const selTeam=S.teams.find(t=>t.id===S.bidTeamId);
-  const selMax=selTeam?maxBid(selTeam,sz):0;
-  const disableSold=!S.bidTeamId||S.bidAmount<0||S.bidAmount>selMax;
-  const opts=S.teams.map(t=>{
-    const rem=sz-toArr(t.roster).length;
-    const full=rem<=0;
-    return`<option value="${t.id}"${full?' disabled':''}${t.id===S.bidTeamId?' selected':''}>${esc(t.name)} (${$m(t.budgetRemaining)} left${full?', full':''})</option>`;
-  }).join('');
-  return`
-<div class="placard" style="margin-bottom:20px;display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:16px">
+    }
+    const selTeam=S.teams.find(t=>t.id===S.bidTeamId);
+    const selMax=selTeam?maxBid(selTeam,sz):0;
+    const disableSold=!S.bidTeamId||S.bidAmount<0||S.bidAmount>selMax;
+    const opts=S.teams.map(t=>{
+      const rem=sz-toArr(t.roster).length;
+      const full=rem<=0;
+      return`<option value="${t.id}"${full?' disabled':''}${t.id===S.bidTeamId?' selected':''}>${esc(t.name)} (${$m(t.budgetRemaining)} left${full?', full':''})</option>`;
+    }).join('');
+    return`
+<div class="placard" style="margin-bottom:${mb};padding:${pad};display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:16px">
   <div>
-    <div style="font-family:'Special Elite',monospace;font-size:11px;letter-spacing:3px;color:#7A1F1F;font-weight:700;text-transform:uppercase;margin-bottom:6px">Now at the podium</div>
-    <div style="font-family:'Alfa Slab One',serif;font-size:34px;color:#231A12;line-height:1.05">${esc(p.name)}</div>
-    <div style="color:#6B5638;font-size:13px;margin-top:4px;letter-spacing:2px;text-transform:uppercase">${p.pos} · ${p.team}</div>
+    <div style="font-family:'Special Elite',monospace;font-size:${eyebrowFz}px;letter-spacing:3px;color:#7A1F1F;font-weight:700;text-transform:uppercase;margin-bottom:4px">Now bidding</div>
+    <div style="font-family:'Alfa Slab One',serif;font-size:${nameFz}px;color:#231A12;line-height:1.05">${esc(p.name)}</div>
+    <div style="color:#6B5638;font-size:${subFz}px;margin-top:2px;letter-spacing:2px;text-transform:uppercase">${p.pos} · ${p.team}</div>
   </div>
   <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
     <select class="plac-inp" id="sel-team">
@@ -502,6 +554,27 @@ function renderPlacard(sz){
     <button class="btn-sold" id="btn-sold"${disableSold?' disabled':''}>Sold!</button>
     <button class="btn-cancel-plac" id="btn-cancel">Cancel</button>
   </div>
+</div>`;
+  }
+
+  // No active nomination — show who's on the clock (and let the commissioner skip them)
+  const onClockId=nominatingTeamId();
+  if(!onClockId)return compact?'':`
+<div class="placard" style="margin-bottom:${mb};padding:${pad};text-align:center">
+  <div style="font-family:'Alfa Slab One',serif;font-size:${compact?18:24}px;color:#231A12">Draft complete!</div>
+</div>`;
+  const onClockTeam=S.teams.find(t=>t.id===onClockId);
+  if(!onClockTeam)return'';
+  return`
+<div class="placard" style="margin-bottom:${mb};padding:${pad};display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap">
+  <div style="display:flex;align-items:center;gap:12px">
+    <span style="width:10px;height:10px;border-radius:50%;background:${onClockTeam.color};display:inline-block;flex-shrink:0"></span>
+    <div>
+      <div style="font-family:'Special Elite',monospace;font-size:${eyebrowFz}px;letter-spacing:3px;color:#7A1F1F;font-weight:700;text-transform:uppercase;margin-bottom:2px">On the clock</div>
+      <div style="font-family:'Alfa Slab One',serif;font-size:${compact?18:26}px;color:#231A12;line-height:1.05">${esc(onClockTeam.name)}</div>
+    </div>
+  </div>
+  ${canControl?`<button class="btn-cancel-plac" id="btn-skip-turn">Skip turn →</button>`:''}
 </div>`;
 }
 
@@ -547,15 +620,14 @@ function renderRoom(sz){
     const drafted=!!dr;
     return`
 <div class="prow ${drafted?'prow-drafted':'prow-avail'}">
-  <span style="font-family:'Special Elite',monospace;font-size:11px;color:#E3B95F;font-weight:700">${p.pos}</span>
-  <span style="font-size:14px;color:#F2EAD3;${drafted?'text-decoration:line-through':''}">${esc(p.name)}</span>
-  <span style="font-size:12px;color:#D9BE93;font-family:'Special Elite',monospace">${p.team}</span>
-  <span style="font-size:11px;color:#AE8B5E;font-family:'Special Elite',monospace">${bye?'Bye '+bye:'—'}</span>
+  <span class="prow-pos" style="font-family:'Special Elite',monospace;font-size:11px;color:#E3B95F;font-weight:700">${p.pos}</span>
+  <span class="prow-name" style="font-size:14px;color:#F2EAD3;${drafted?'text-decoration:line-through':''}">${esc(p.name)}</span>
+  <span class="prow-meta" style="font-size:12px;color:#D9BE93;font-family:'Special Elite',monospace">${p.team}${bye?' · Bye '+bye:''}</span>
   ${drafted
-    ?`<span style="font-size:12px;font-family:'Special Elite',monospace;font-weight:700;text-align:right;color:${drTeam?.color||'#D9BE93'}">${esc(drTeam?.name||'')} · ${$m(dr.price)}</span>`
+    ?`<span class="prow-action" style="font-size:12px;font-family:'Special Elite',monospace;font-weight:700;text-align:right;color:${drTeam?.color||'#D9BE93'}">${esc(drTeam?.name||'')} · ${$m(dr.price)}</span>`
     :canControl
-      ?`<button class="btn-nom nom-btn" data-pid="${p.id}">Nominate</button>`
-      :'<span></span>'}
+      ?`<button class="btn-nom nom-btn prow-action" data-pid="${p.id}">Nominate</button>`
+      :'<span class="prow-action"></span>'}
 </div>`;
   }).join('');
 
@@ -604,15 +676,15 @@ function renderRoom(sz){
 function renderBoard(sz){
   const{teams,presentMode}=S;
   const canControl=(isCommissioner||!S.commissionerCode)&&!presentMode;
-  // Scale fonts down as team count grows so all columns fit without scrolling
+  // Scale fonts down as team count and roster size grow so columns fit without scrolling
   const n=Math.max(teams.length,1);
-  const scale=Math.max(0.62,1-(n-6)*0.03);
-  const nameFz=(12.5*scale).toFixed(1);
-  const detailFz=(10.5*scale).toFixed(1);
-  const hdNameFz=(15*scale).toFixed(1);
+  const scale=Math.max(0.6,1-(n-6)*0.028-Math.max(0,sz-13)*0.01);
+  const nameFz=(13*scale).toFixed(1);
+  const detailFz=(11*scale).toFixed(1);
+  const hdNameFz=(15.5*scale).toFixed(1);
   const hdBudgetFz=(14*scale).toFixed(1);
-  const gapPx=n>10?6:10;
-  const padPx=n>10?5:8;
+  const gapPx=n>10||sz>15?5:8;
+  const padPx=n>10||sz>15?4:7;
 
   const onClockId=nominatingTeamId();
   const cols=teams.map(t=>{
@@ -622,9 +694,9 @@ function renderBoard(sz){
       const p=PLAYER_BY_ID[pick.playerId];if(!p)return'';
       return`
 <div class="board-pick">
-  <div style="font-size:${nameFz}px;font-weight:600;color:#F2EAD3;padding-right:${canControl?22:4}px;white-space:nowrap;overflow:hidden;margin-bottom:3px">${esc(p.name)}</div>
+  <div class="board-name" style="font-size:${nameFz}px;font-weight:600;color:#F2EAD3;padding-right:${canControl?22:4}px;white-space:nowrap;overflow:hidden;margin-bottom:3px">${esc(p.name)}</div>
   <div style="display:flex;justify-content:space-between;font-size:${detailFz}px;color:#D9BE93;font-family:'Special Elite',monospace">
-    <span>${p.pos}·${p.team}</span><span style="color:#E3B95F;font-weight:700">${$m(pick.price)}</span>
+    <span class="board-detail">${p.pos}·${p.team}</span><span class="board-detail" style="color:#E3B95F;font-weight:700">${$m(pick.price)}</span>
   </div>
   ${canControl?`<button class="undo-btn" data-tid="${t.id}" data-pid="${pick.playerId}"
     style="position:absolute;top:3px;right:4px;background:transparent;border:none;color:#AE8B5E;font-size:9px;cursor:pointer;font-family:'Special Elite',monospace;padding:1px">undo</button>`:''}
@@ -633,25 +705,26 @@ function renderBoard(sz){
     const empties=Array.from({length:Math.max(0,sz-roster.length)}).map(()=>'<div class="board-empty"></div>').join('');
     return`
 <div style="background:#5A3819;border:${onClock?'3px solid #E3B95F':'1px solid #8A5F35'};border-radius:3px;overflow:hidden;display:flex;flex-direction:column;min-width:0${onClock?';box-shadow:0 0 10px #E3B95F80':''}">
-  <div style="padding:8px 10px;background:${t.color};color:#F7EFDA;position:relative">
+  <div style="padding:6px 8px;background:${t.color};color:#F7EFDA;position:relative">
     ${onClock?`<div style="font-family:'Special Elite',monospace;font-size:9px;letter-spacing:2px;color:#E3B95F;font-weight:700;margin-bottom:2px">● ON THE CLOCK</div>`:''}
-    <div style="font-family:'Saira Condensed',sans-serif;font-size:${hdNameFz}px;font-weight:700;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(t.name)}</div>
-    <div style="font-family:'Special Elite',monospace;font-size:${hdBudgetFz}px;font-weight:700">${$m(t.budgetRemaining)} left</div>
+    <div class="board-hd-name" style="font-family:'Saira Condensed',sans-serif;font-size:${hdNameFz}px;font-weight:700;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(t.name)}</div>
+    <div class="board-hd-budget" style="font-family:'Special Elite',monospace;font-size:${hdBudgetFz}px;font-weight:700">${$m(t.budgetRemaining)} left</div>
   </div>
   <div style="display:flex;flex-direction:column;gap:${gapPx/2}px;padding:${padPx}px">${picks}${empties}</div>
 </div>`;
   }).join('');
 
   const wrapStyle=presentMode
-    ?'position:fixed;inset:0;background:radial-gradient(120% 80% at 15% 0%,#7A5029 0%,#5E3B1D 45%,#3F2611 100%);z-index:1000;padding:20px;overflow:hidden'
+    ?'position:fixed;inset:0;background:radial-gradient(120% 80% at 15% 0%,#7A5029 0%,#5E3B1D 45%,#3F2611 100%);z-index:1000;padding:14px;overflow:hidden'
     :'';
   return`
 <div style="${wrapStyle}${presentMode?';display:flex;flex-direction:column':''}">
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px${presentMode?';flex-shrink:0':''}">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px${presentMode?';flex-shrink:0':''}">
     <span class="eyebrow-sm">DRAFT BOARD</span>
     <button class="btn-ghost" id="btn-present">${presentMode?'Exit Present Mode':'Present Mode (for projector)'}</button>
   </div>
-  <div style="display:grid;gap:${gapPx}px;grid-template-columns:repeat(${n},1fr);${presentMode?'flex:1;overflow:hidden':''}">
+  ${renderNomBanner(sz,{compact:true,readOnly:presentMode})}
+  <div class="board-grid${presentMode?' board-grid-present':''}" style="--cols:${n};gap:${gapPx}px">
     ${cols}
   </div>
 </div>`;
@@ -688,6 +761,68 @@ function renderRosters(){
   }).join('');
 
   return`<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px">${cards}</div>`;
+}
+
+// Yahoo has no bulk-import for an offline draft — results are entered manually,
+// team by team, via each team's Edit Roster → Add Player screen. This view is
+// sorted highest-price-first per team to make that manual pass as fast as
+// possible, plus a CSV for a permanent record.
+function exportCsv(){
+  const{teams}=S;
+  const rows=[['Team','Player','Position','NFL Team','Price']];
+  teams.forEach(t=>{
+    toArr(t.roster).slice().sort((a,b)=>b.price-a.price).forEach(pick=>{
+      const p=PLAYER_BY_ID[pick.playerId];if(!p)return;
+      rows.push([t.name,p.name,p.pos,p.team,pick.price]);
+    });
+  });
+  const csv=rows.map(r=>r.map(v=>{
+    const s=String(v);
+    return/[",\r\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s;
+  }).join(',')).join('\r\n');
+  const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;a.download=`${(S.leagueName||'draft').replace(/[^a-z0-9]+/gi,'_')}_results.csv`;
+  document.body.appendChild(a);a.click();document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function renderExport(){
+  const{teams}=S;
+  const cards=teams.map(t=>{
+    const picks=toArr(t.roster).slice().sort((a,b)=>b.price-a.price).map(pick=>{
+      const p=PLAYER_BY_ID[pick.playerId];if(!p)return'';
+      return`
+<div style="display:flex;justify-content:space-between;gap:10px;font-size:13px;padding:5px 0;border-bottom:1px solid rgba(242,234,211,0.08)">
+  <span>${esc(p.name)} <span style="color:#AE8B5E;font-size:11px;font-family:'Special Elite',monospace">${p.pos}·${p.team}</span></span>
+  <span style="color:#E3B95F;font-weight:700;flex-shrink:0">${$m(pick.price)}</span>
+</div>`;
+    }).join('');
+    return`
+<div style="background:#5A3819;border:1px solid #8A5F35;border-top:3px solid ${t.color};border-radius:3px;padding:12px">
+  <div style="font-family:'Saira Condensed',sans-serif;font-size:14px;font-weight:700;text-transform:uppercase;color:#F2EAD3;margin-bottom:6px">${esc(t.name)}</div>
+  ${picks||'<div style="color:#AE8B5E;font-size:12px">No picks yet</div>'}
+</div>`;
+  }).join('');
+  return`
+<div style="position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:500;display:flex;align-items:center;justify-content:center;padding:24px">
+  <div class="panel" style="max-width:720px;width:100%;max-height:85vh;overflow-y:auto;padding:24px">
+    <div class="eyebrow" style="margin-bottom:4px">EXPORT RESULTS</div>
+    <div style="font-family:'Alfa Slab One',serif;font-size:22px;color:#F2EAD3;margin-bottom:10px">Ready for Yahoo.</div>
+    <div style="color:#D9BE93;font-size:13px;margin-bottom:16px;line-height:1.5">
+      Yahoo doesn't support bulk-importing an offline draft — you'll enter each result manually, team by team,
+      from that team's <strong>Edit Roster → Add Player</strong> screen (it'll prompt for the price on an auction
+      league). The list below is sorted highest price first per team so you can move through it quickly with this
+      open next to Yahoo. <strong>Download CSV</strong> keeps a spreadsheet copy for your records either way.
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
+      <button class="btn-primary" id="btn-export-csv" style="padding:10px 20px;font-size:13px">Download CSV</button>
+      <button class="btn-ghost" id="btn-export-close">Close</button>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px">${cards}</div>
+  </div>
+</div>`;
 }
 
 function renderCommLogin(){
@@ -747,6 +882,9 @@ function bind(){
   // Draft header
   all('[data-view]').forEach(el=>el.addEventListener('click',e=>setView(e.currentTarget.dataset.view)));
   g('btn-new-draft')?.addEventListener('click',newDraft);
+  g('btn-export')?.addEventListener('click',()=>{exportOpen=true;render()});
+  g('btn-export-close')?.addEventListener('click',()=>{exportOpen=false;render()});
+  g('btn-export-csv')?.addEventListener('click',exportCsv);
   g('btn-copy')?.addEventListener('click',e=>{
     navigator.clipboard.writeText(location.href).catch(()=>{});
     e.target.textContent='Copied!';
@@ -767,6 +905,7 @@ function bind(){
   });
   g('btn-sold')?.addEventListener('click',confirmSold);
   g('btn-cancel')?.addEventListener('click',closeNom);
+  g('btn-skip-turn')?.addEventListener('click',skipNomination);
 
   // Room
   g('inp-search')?.addEventListener('input',e=>{
